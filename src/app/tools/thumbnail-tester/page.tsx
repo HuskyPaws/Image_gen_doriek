@@ -14,15 +14,15 @@ import {
   Shuffle, 
   Sun, 
   Moon, 
-  Monitor, 
-  Layout, 
   Image as ImageIcon,
   Eye,
-  Clock,
+  EyeOff,
   User,
   LayoutGrid,
   LayoutList,
-  RefreshCw
+  Search,
+  Loader2,
+  Youtube
 } from 'lucide-react';
 
 // Types
@@ -78,23 +78,68 @@ function generateId(): string {
   return Math.random().toString(36).substr(2, 9);
 }
 
+function getYoutubeApiKey(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('youtube_api_key');
+}
+
+function formatViewCount(count: string): string {
+  const num = parseInt(count);
+  if (isNaN(num)) return count;
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M views`;
+  if (num >= 1000) return `${(num / 1000).toFixed(0)}K views`;
+  return `${num} views`;
+}
+
+function formatDuration(duration: string): string {
+  // Parse ISO 8601 duration (e.g., PT1H2M3S)
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return '0:00';
+  
+  const hours = parseInt(match[1] || '0');
+  const minutes = parseInt(match[2] || '0');
+  const seconds = parseInt(match[3] || '0');
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function formatUploadTime(publishedAt: string): string {
+  const now = new Date();
+  const published = new Date(publishedAt);
+  const diffMs = now.getTime() - published.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return '1 day ago';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+  return `${Math.floor(diffDays / 365)} years ago`;
+}
+
 // YouTube-style video card for Homepage view
 function HomepageVideoCard({ 
   video, 
   darkMode,
+  showHighlight = true,
   onClick 
 }: { 
   video: VideoItem; 
   darkMode: boolean;
+  showHighlight?: boolean;
   onClick?: () => void;
 }) {
-  const bgColor = darkMode ? 'bg-[#0f0f0f]' : 'bg-white';
+  const [avatarError, setAvatarError] = useState(false);
   const textColor = darkMode ? 'text-white' : 'text-[#0f0f0f]';
   const mutedColor = darkMode ? 'text-[#aaa]' : 'text-[#606060]';
+  const shouldHighlight = video.isYours && showHighlight;
   
   return (
     <div 
-      className={`cursor-pointer group ${video.isYours ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
+      className={`cursor-pointer group ${shouldHighlight ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
       onClick={onClick}
     >
       {/* Thumbnail */}
@@ -114,7 +159,7 @@ function HomepageVideoCard({
         <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs font-medium px-1 py-0.5 rounded">
           {video.duration}
         </div>
-        {video.isYours && (
+        {shouldHighlight && (
           <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded">
             YOUR VIDEO
           </div>
@@ -125,11 +170,13 @@ function HomepageVideoCard({
       <div className="flex gap-3 mt-3">
         {/* Channel avatar */}
         <div className="flex-shrink-0">
-          {video.channelAvatar ? (
+          {video.channelAvatar && !avatarError ? (
             <img 
               src={video.channelAvatar} 
               alt={video.channelName}
-              className="w-9 h-9 rounded-full"
+              className="w-9 h-9 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+              onError={() => setAvatarError(true)}
             />
           ) : (
             <div className={`w-9 h-9 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
@@ -159,18 +206,21 @@ function HomepageVideoCard({
 function SidebarVideoCard({ 
   video, 
   darkMode,
+  showHighlight = true,
   onClick 
 }: { 
   video: VideoItem; 
   darkMode: boolean;
+  showHighlight?: boolean;
   onClick?: () => void;
 }) {
   const textColor = darkMode ? 'text-white' : 'text-[#0f0f0f]';
   const mutedColor = darkMode ? 'text-[#aaa]' : 'text-[#606060]';
+  const shouldHighlight = video.isYours && showHighlight;
   
   return (
     <div 
-      className={`flex gap-2 cursor-pointer group ${video.isYours ? 'ring-2 ring-blue-500 rounded-lg p-1 -m-1' : ''}`}
+      className={`flex gap-2 cursor-pointer group ${shouldHighlight ? 'ring-2 ring-blue-500 rounded-lg p-1 -m-1' : ''}`}
       onClick={onClick}
     >
       {/* Thumbnail */}
@@ -190,7 +240,7 @@ function SidebarVideoCard({
         <div className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] font-medium px-1 py-0.5 rounded">
           {video.duration}
         </div>
-        {video.isYours && (
+        {shouldHighlight && (
           <div className="absolute top-1 left-1 bg-blue-500 text-white text-[8px] font-bold px-1 py-0.5 rounded">
             YOURS
           </div>
@@ -216,7 +266,7 @@ function SidebarVideoCard({
 export default function ThumbnailTesterPage() {
   // Your video state
   const [yourThumbnail, setYourThumbnail] = useState<string>('');
-  const [yourTitle, setYourTitle] = useState('My Amazing Video Title');
+  const [yourTitle] = useState('My Amazing Video Title');
   const [yourChannel, setYourChannel] = useState('My Channel');
   const [yourViews, setYourViews] = useState('0 views');
   const [yourUploadTime, setYourUploadTime] = useState('Just now');
@@ -233,6 +283,12 @@ export default function ThumbnailTesterPage() {
   const [viewMode, setViewMode] = useState<'homepage' | 'sidebar'>('homepage');
   const [darkMode, setDarkMode] = useState(true);
   const [videos, setVideos] = useState<VideoItem[]>([]);
+  const [showYourVideoHighlight, setShowYourVideoHighlight] = useState(true);
+  
+  // YouTube search state
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchOrder, setSearchOrder] = useState<'relevance' | 'viewCount' | 'date'>('relevance');
   
   // File input ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -325,6 +381,125 @@ export default function ThumbnailTesterPage() {
     });
   }
 
+  async function searchYouTubeVideos() {
+    const apiKey = getYoutubeApiKey();
+    if (!apiKey) {
+      alert('Please add your YouTube Data API key in Settings to search videos.');
+      return;
+    }
+
+    if (!searchKeyword.trim()) {
+      alert('Please enter a search keyword.');
+      return;
+    }
+
+    setIsSearching(true);
+
+    try {
+      // Step 1: Search for videos (fetch more to filter out Shorts)
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchKeyword)}&type=video&maxResults=30&order=${searchOrder}&key=${apiKey}`;
+      const searchResponse = await fetch(searchUrl);
+      
+      if (!searchResponse.ok) {
+        const errorData = await searchResponse.json();
+        throw new Error(errorData.error?.message || 'Failed to search videos');
+      }
+      
+      const searchData = await searchResponse.json();
+      const videoIds = searchData.items.map((item: any) => item.id.videoId).join(',');
+
+      if (!videoIds) {
+        alert('No videos found for this keyword.');
+        setIsSearching(false);
+        return;
+      }
+
+      // Step 2: Get video details (views, duration)
+      const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoIds}&key=${apiKey}`;
+      const detailsResponse = await fetch(detailsUrl);
+      
+      if (!detailsResponse.ok) {
+        const errorData = await detailsResponse.json();
+        throw new Error(errorData.error?.message || 'Failed to get video details');
+      }
+
+      const detailsData = await detailsResponse.json();
+
+      // Helper to get duration in seconds
+      const getDurationSeconds = (duration: string): number => {
+        const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (!match) return 0;
+        const hours = parseInt(match[1] || '0');
+        const minutes = parseInt(match[2] || '0');
+        const seconds = parseInt(match[3] || '0');
+        return hours * 3600 + minutes * 60 + seconds;
+      };
+
+      // Helper to check if video is a Short or too short (under 3 minutes)
+      const isShortOrTooShort = (item: any): boolean => {
+        const duration = getDurationSeconds(item.contentDetails.duration);
+        const title = item.snippet.title.toLowerCase();
+        const description = (item.snippet.description || '').toLowerCase();
+        
+        // Filter out if: under 3 minutes (180 seconds), has #shorts tag
+        if (duration < 180) return true;
+        if (title.includes('#shorts') || title.includes('#short')) return true;
+        if (description.includes('#shorts') || description.includes('#short')) return true;
+        
+        return false;
+      };
+
+      // Step 3: Filter out Shorts and videos under 3 minutes
+      const filteredVideos = detailsData.items.filter((item: any) => !isShortOrTooShort(item)).slice(0, 10);
+
+      if (filteredVideos.length === 0) {
+        alert('No videos found over 3 minutes. Try a different keyword.');
+        setIsSearching(false);
+        return;
+      }
+
+      // Step 4: Get channel icons
+      const channelIds = [...new Set(filteredVideos.map((item: any) => item.snippet.channelId))].join(',');
+      const channelsUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelIds}&key=${apiKey}`;
+      const channelsResponse = await fetch(channelsUrl);
+      
+      let channelAvatars: Record<string, string> = {};
+      if (channelsResponse.ok) {
+        const channelsData = await channelsResponse.json();
+        channelAvatars = channelsData.items.reduce((acc: Record<string, string>, channel: any) => {
+          // Try to get the best quality avatar, some URLs might be blocked
+          const avatar = channel.snippet.thumbnails.medium?.url || 
+                        channel.snippet.thumbnails.default?.url || 
+                        channel.snippet.thumbnails.high?.url || '';
+          acc[channel.id] = avatar;
+          return acc;
+        }, {});
+      }
+
+      // Step 5: Convert to our VideoItem format
+      const newCompetitors: VideoItem[] = filteredVideos.map((item: any) => ({
+        id: generateId(),
+        thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
+        title: item.snippet.title,
+        channelName: item.snippet.channelTitle,
+        channelAvatar: channelAvatars[item.snippet.channelId] || '',
+        views: formatViewCount(item.statistics.viewCount || '0'),
+        uploadTime: formatUploadTime(item.snippet.publishedAt),
+        duration: formatDuration(item.contentDetails.duration),
+        isYours: false,
+      }));
+
+      // Replace existing competitors with search results
+      setCompetitors(newCompetitors);
+
+    } catch (error) {
+      console.error('YouTube search failed:', error);
+      alert(`Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
   function addTitleVariation() {
     setTitleVariations(prev => [...prev, `Title Variation ${prev.length + 1}`]);
   }
@@ -392,6 +567,7 @@ export default function ThumbnailTesterPage() {
               variant="outline"
               size="sm"
               onClick={() => setDarkMode(!darkMode)}
+              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
@@ -399,8 +575,17 @@ export default function ThumbnailTesterPage() {
               variant="outline"
               size="sm"
               onClick={shuffleVideos}
+              title="Shuffle video order"
             >
               <Shuffle className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={showYourVideoHighlight ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowYourVideoHighlight(!showYourVideoHighlight)}
+              title={showYourVideoHighlight ? 'Hide your video highlight' : 'Show your video highlight'}
+            >
+              {showYourVideoHighlight ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
             </Button>
           </div>
         </div>
@@ -533,7 +718,57 @@ export default function ThumbnailTesterPage() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
+              <CardContent className="space-y-3">
+                {/* YouTube Search */}
+                <div className="p-3 bg-red-950/30 rounded-lg border border-red-500/30 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Youtube className="h-4 w-4 text-red-500" />
+                    <span className="text-sm font-medium text-red-400">Search YouTube</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={searchKeyword}
+                      onChange={(e) => setSearchKeyword(e.target.value)}
+                      placeholder="Enter keyword..."
+                      className="flex-1 h-8 text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !isSearching) {
+                          searchYouTubeVideos();
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={searchYouTubeVideos}
+                      disabled={isSearching || !searchKeyword.trim()}
+                      className="bg-red-600 hover:bg-red-700 h-8"
+                    >
+                      {isSearching ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <select
+                    value={searchOrder}
+                    onChange={(e) => setSearchOrder(e.target.value as any)}
+                    className="w-full h-7 text-xs bg-slate-800 border border-slate-600 rounded px-2"
+                  >
+                    <option value="relevance">Sort: Most Relevant</option>
+                    <option value="viewCount">Sort: Most Views</option>
+                    <option value="date">Sort: Most Recent</option>
+                  </select>
+                  {!getYoutubeApiKey() && (
+                    <p className="text-xs text-amber-400">
+                      Add YouTube API key in Settings to enable search
+                    </p>
+                  )}
+                </div>
+
+                {/* Competitor List */}
+                <div className="max-h-[300px] overflow-y-auto space-y-3">
                 {competitors.map((comp) => (
                   <div key={comp.id} className="p-3 bg-slate-800 rounded-lg space-y-2">
                     <div className="flex items-start gap-2">
@@ -605,6 +840,7 @@ export default function ThumbnailTesterPage() {
                   onChange={handleCompetitorThumbnailUpload}
                   className="hidden"
                 />
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -631,6 +867,7 @@ export default function ThumbnailTesterPage() {
                         key={video.id} 
                         video={video} 
                         darkMode={darkMode}
+                        showHighlight={showYourVideoHighlight}
                       />
                     ))}
                   </div>
@@ -664,6 +901,7 @@ export default function ThumbnailTesterPage() {
                           key={video.id} 
                           video={video} 
                           darkMode={darkMode}
+                          showHighlight={showYourVideoHighlight}
                         />
                       ))}
                     </div>

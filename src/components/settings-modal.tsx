@@ -18,11 +18,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [currentOpenaiKey, setCurrentOpenaiKey] = useState('');
   const [showClearDialog, setShowClearDialog] = useState(false);
-  const [clearTarget, setClearTarget] = useState<'fal' | 'openai' | 'openrouter' | 'pexels' | 'pixabay' | 'elevenlabs'>('fal');
+  const [clearTarget, setClearTarget] = useState<'fal' | 'openai' | 'openrouter' | 'pexels' | 'pixabay' | 'elevenlabs' | 'youtube'>('fal');
   const [openrouterApiKey, setOpenrouterApiKey] = useState('');
   // ElevenLabs API key for text-to-speech
   const [elevenlabsApiKey, setElevenlabsApiKey] = useState('');
   const [currentElevenlabsKey, setCurrentElevenlabsKey] = useState('');
+  // YouTube Data API key
+  const [youtubeApiKey, setYoutubeApiKey] = useState('');
+  const [currentYoutubeKey, setCurrentYoutubeKey] = useState('');
   const [currentOpenrouterKey, setCurrentOpenrouterKey] = useState('');
   const [openrouterModelId, setOpenrouterModelId] = useState('');
   const [currentOpenrouterModelId, setCurrentOpenrouterModelId] = useState('');
@@ -49,6 +52,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       const savedPexels = localStorage.getItem('pexels_api_key') || '';
       const savedPixabay = localStorage.getItem('pixabay_api_key') || '';
       const savedElevenlabs = localStorage.getItem('elevenlabs_api_key') || '';
+      const savedYoutube = localStorage.getItem('youtube_api_key') || '';
       setCurrentKey(savedFal);
       setApiKey(savedFal);
       setCurrentOpenaiKey(savedOpenai);
@@ -63,6 +67,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setPixabayApiKey(savedPixabay);
       setCurrentElevenlabsKey(savedElevenlabs);
       setElevenlabsApiKey(savedElevenlabs);
+      setCurrentYoutubeKey(savedYoutube);
+      setYoutubeApiKey(savedYoutube);
     }
   }, [isOpen]);
 
@@ -117,6 +123,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         localStorage.removeItem('elevenlabs_api_key');
       }
       setCurrentElevenlabsKey(elevenlabsApiKey.trim());
+
+      // Save YouTube API key
+      if (youtubeApiKey?.trim()) {
+        localStorage.setItem('youtube_api_key', youtubeApiKey.trim());
+      } else {
+        localStorage.removeItem('youtube_api_key');
+      }
+      setCurrentYoutubeKey(youtubeApiKey.trim());
       
       // Configure fal.ai client immediately
       if (apiKey) {
@@ -159,12 +173,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         localStorage.removeItem('elevenlabs_api_key');
         setElevenlabsApiKey('');
         setCurrentElevenlabsKey('');
+      } else if (clearTarget === 'youtube') {
+        localStorage.removeItem('youtube_api_key');
+        setYoutubeApiKey('');
+        setCurrentYoutubeKey('');
       }
       setShowClearDialog(false);
     }
   }
 
-  function openClearDialog(target: 'fal' | 'openai' | 'openrouter' | 'pexels' | 'pixabay' | 'elevenlabs') {
+  function openClearDialog(target: 'fal' | 'openai' | 'openrouter' | 'pexels' | 'pixabay' | 'elevenlabs' | 'youtube') {
     setClearTarget(target);
     setShowClearDialog(true);
   }
@@ -335,6 +353,41 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             {/* Right Column */}
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 pb-2">
+                Other APIs
+              </h3>
+
+              {/* YouTube Data API Key */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  YouTube Data API Key
+                </label>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Thumbnail Tester (search videos)</p>
+                <Input
+                  type="password"
+                  placeholder="Enter your YouTube API key..."
+                  value={youtubeApiKey}
+                  onChange={(e) => setYoutubeApiKey(e.target.value)}
+                />
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                  Get key at{' '}
+                  <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    Google Cloud Console
+                  </a>
+                </p>
+                {currentYoutubeKey && (
+                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Key className="h-3 w-3 text-red-600 dark:text-red-400" />
+                      <span className="text-xs text-red-800 dark:text-red-200">{currentYoutubeKey.substring(0, 10)}...</span>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => openClearDialog('youtube')} className="h-5 w-5 p-0">
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 pb-2 pt-2">
                 Stock Image APIs (Optional)
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -426,12 +479,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 clearTarget === 'openai' ? 'OpenAI' : 
                 clearTarget === 'openrouter' ? 'OpenRouter' :
                 clearTarget === 'pexels' ? 'Pexels' : 
-                clearTarget === 'pixabay' ? 'Pixabay' : 'ElevenLabs'
+                clearTarget === 'pixabay' ? 'Pixabay' : 
+                clearTarget === 'elevenlabs' ? 'ElevenLabs' : 'YouTube'
               } API key? 
               {clearTarget === 'fal' ? "You'll need it for Minimax/Imagen 4/Seedream/Nano Banana." : 
                clearTarget === 'openai' ? "You'll need it for GPT Image 1." : 
                clearTarget === 'openrouter' ? "You'll need it for Claude Sonnet prompt generation." :
                clearTarget === 'elevenlabs' ? "You'll need it for text-to-speech audio generation." :
+               clearTarget === 'youtube' ? "You'll need it for searching YouTube videos in Thumbnail Tester." :
                "This is optional - Wikimedia Commons (primary) doesn't require a key."}
             </AlertDialogDescription>
           </AlertDialogHeader>
