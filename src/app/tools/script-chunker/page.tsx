@@ -86,10 +86,10 @@ export default function ScriptChunkerPage() {
   const [audioChunks, setAudioChunks] = useState<AudioChunk[]>([]);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [audioProgress, setAudioProgress] = useState({ current: 0, total: 0 });
-  const [selectedVoiceId, setSelectedVoiceId] = useState(POPULAR_VOICES[0].voice_id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(POPULAR_VOICES[0].voice_id);
   const [availableVoices, setAvailableVoices] = useState<ElevenLabsVoice[]>([]);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
-  const [selectedAudioModel, setSelectedAudioModel] = useState(ELEVENLABS_MODELS.MULTILINGUAL_V2);
+  const [selectedAudioModel, setSelectedAudioModel] = useState<string>(ELEVENLABS_MODELS.MULTILINGUAL_V2);
   const [playingChunkId, setPlayingChunkId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Voice settings
@@ -154,6 +154,7 @@ export default function ScriptChunkerPage() {
     if (showAudioSection && availableVoices.length === 0 && !isLoadingVoices) {
       loadVoices();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAudioSection]);
 
   // Load favorite voices and audio presets from localStorage
@@ -886,7 +887,6 @@ export default function ScriptChunkerPage() {
   }
 
   const avgWordsPerChunk = chunks.length > 0 ? Math.round(chunks.reduce((sum, c) => sum + c.wordCount, 0) / chunks.length) : 0;
-  const promptsText = prompts.map(p => p.prompt).join('\n');
 
   function handleTestExport() {
     if (chunks.length === 0) return;
@@ -904,9 +904,6 @@ export default function ScriptChunkerPage() {
     const reconstructedCharCount = reconstructedText.trim().length;
     
     // Find missing and added words
-    const originalWordSet = new Set(originalWords.map(w => w.toLowerCase()));
-    const reconstructedWordSet = new Set(reconstructedWords.map(w => w.toLowerCase()));
-    
     const missingWords: string[] = [];
     const addedWords: string[] = [];
     

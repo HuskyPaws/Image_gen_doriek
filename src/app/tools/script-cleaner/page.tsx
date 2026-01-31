@@ -23,7 +23,7 @@ export default function ScriptCleanerPage() {
     setRemovedCount(matches ? matches.length : 0);
 
     // Remove the bracketed content and clean up extra blank lines
-    let cleaned = inputScript
+    const cleaned = inputScript
       .replace(bracketPattern, '') // Remove all [bracketed] content
       .replace(/\n{3,}/g, '\n\n') // Replace 3+ newlines with 2
       .trim();
