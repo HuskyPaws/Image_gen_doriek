@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { SettingsModal } from './settings-modal';
-import { Settings, Scissors, Globe, Eraser, Image } from 'lucide-react';
+import { Settings, Scissors, Globe, Eraser, Image, HelpCircle } from 'lucide-react';
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -71,6 +71,15 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </Button>
+              <Link href="/docs">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  title="Help & Documentation"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              </Link>
               <span className="text-sm text-slate-600 dark:text-slate-400">
                 Powered by fal.ai
               </span>
