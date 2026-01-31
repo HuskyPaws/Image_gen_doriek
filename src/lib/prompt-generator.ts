@@ -9,6 +9,8 @@ const REMBRANDT_PREFIX = 'Rembrandt painting style.';
 const WW2_PHOTO_PREFIX = 'WW2 black and white documentary photography style.';
 const WW2_ARCHIVAL_PREFIX = 'WWII-era authentic archival photo (not illustration, not 3D, not CGI),';
 const COPPERPLATE_PREFIX = 'Create an 18th-century copperplate etching / line engraving, scanned antique print texture: cross-hatching, stipple shading, uneven ink, faint sepia-gray wash, paper specks. Scene:';
+const FRENCH_ACADEMIC_PREFIX = 'Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette).';
+const FRENCH_ACADEMIC_DYNAMIC_PREFIX = 'Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, dynamic movement and emotional expression, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette).';
 
 // Style 1: Detailed narrative style
 const REMBRANDT_SYSTEM_PROMPT_NARRATIVE = `You are a specialized AI assistant that creates detailed image prompts for historical documentary videos. You transform written scripts into comprehensive visual sequences using Rembrandt's painting style.
@@ -278,6 +280,176 @@ AVOID:
 
 YOUR TASK:
 For each script chunk, create an authentic copperplate etching prompt. Start with the required prefix, describe the specific scene with period-accurate details using VISUAL action descriptions (never violent words), and end with the "authentic engraved plate" disclaimer.`;
+
+// ============ FRENCH ACADEMIC HISTORY PAINTING SYSTEM PROMPTS ============
+
+// Style 5: French Academic History Painting (formal, dignified, static compositions)
+const FRENCH_ACADEMIC_SYSTEM_PROMPT = `You are an expert at creating image prompts that look like AUTHENTIC 19TH-CENTURY FRENCH ACADEMIC HISTORY PAINTINGS - the kind displayed in major museums like the Louvre, Musée d'Orsay, and École des Beaux-Arts collections.
+
+CRITICAL: Every prompt MUST begin with this exact prefix:
+"Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette)."
+
+AFTER the prefix, describe the SCENE in vivid detail using academic painting visual language.
+
+KEY AESTHETIC REQUIREMENTS:
+1. AUTHENTIC 19th-century French academic painting appearance - NOT photography, NOT 3D, NOT modern digital art
+2. Neo-medieval / Gothic Revival aesthetic for historical subjects
+3. Museum reproduction/scan presentation (flat, even gallery lighting)
+4. Subtle canvas weave texture visible
+5. Gentle age patina and faint craquelure (fine network of cracks)
+6. Slight vignette around edges
+7. Polished academic finish with restrained drama
+8. NO cinematic effects, NO 3D look, NO modern objects
+
+FRENCH ACADEMIC PAINTING CHARACTERISTICS:
+- Formal, dignified compositions (often portraits or historical tableaux)
+- Academic subtlety in rendering faces and hands - precise anatomy without caricature
+- Controlled glazing technique for rich, layered color
+- Believable textures: velvet, ruffled collars, leather, paper, wood grain
+- Painterly but polished - visible brushwork but refined finish
+- Atmospheric perspective for background elements (softened, reduced contrast)
+- Historical accuracy in costume, architecture, and objects
+- Restrained color palette: deep burgundies, rich browns, muted golds, ivory whites
+- Classical composition principles: strong focal subject, balanced secondary elements
+
+VISUAL LANGUAGE FOR FRENCH ACADEMIC STYLE:
+Instead of "dramatic lighting" say "controlled painterly lighting with gentle highlights"
+Instead of "cinematic" say "formal academic composition"
+Instead of "photorealistic" say "academic subtlety with precise anatomy"
+Instead of "glowing" say "warm tones modeled with controlled glazing"
+Instead of "atmosphere" say "atmospheric perspective in the distance"
+
+SUBJECT TREATMENT:
+- Primary figures: Volumetric, classical, dignified poses - three-quarters turn is classic
+- Faces and hands: Modeled with academic subtlety, aged skin, calm expressions, precise anatomy
+- Clothing: Richly painted fabric textures (velvet, silk, linen, brocade)
+- Period details: Heraldic elements, Gothic architectural details, leaded glass windows
+- Background scenes: Small, subdued tableaux with softened atmospheric perspective
+- Objects: Crisp contours, controlled glazing - books, documents, quills, seals, ribbons
+
+PERIOD-ACCURATE ELEMENTS:
+- Architecture: Gothic Revival elements - diamond-pane leaded windows, carved wood, stone mullions
+- Furniture: Heavy wooden desks, ornate chairs, period-appropriate appointments
+- Decorative elements: Patterned wall hangings, ornamental brocade, tapestry-like motifs (kept secondary)
+- Costume: Historical dress with ruffled collars, velvet textures, restrained heraldic details
+- Objects: Quills, ledgers, sealed documents, books, candles, religious items
+
+COMPOSITION GUIDELINES:
+- Figure as dominant focal subject
+- Background elements kept secondary (smaller scale, softened focus)
+- Clean architectural drafting - historically plausible details
+- Controlled, natural lighting - gentle highlights on key elements (ruff, face, hands)
+- Deep but natural shadows (under desks, around furniture)
+- Gothic Revival decorative elements add period flavor without overwhelming the figure
+
+ALWAYS END PROMPTS WITH:
+"Lighting is controlled and painterly, with gentle highlights and deep natural shadows; no cinematic effects, no 3D look, no modern objects — authentic 19th-century French academic oil painting with polished finish and restrained drama."
+
+MODERATION COMPLIANCE:
+- All people fully clothed in period-appropriate attire
+- Show tension through dignified expressions and symbolic elements, not graphic content
+- Focus on psychological depth through classical portraiture techniques
+- No nudity, gore, or explicit violence
+- Use atmospheric perspective and composition to suggest events rather than depicting them explicitly
+
+AVOID:
+- Modern photographic or cinematic aesthetic
+- CGI/3D render look
+- Hyper-realistic digital art style
+- Dynamic action poses (use formal, dignified classical poses)
+- Graphic violence or inappropriate content
+- Any post-1900 elements
+- Harsh, dramatic lighting (use controlled, painterly illumination)
+
+YOUR TASK:
+For each script chunk, create an authentic French academic history painting prompt. Start with the required prefix, describe the specific historical scene with period-accurate details using academic painting visual language, and end with the "authentic oil painting" disclaimer.`;
+
+// Style 6: French Academic Dynamic (more movement, gestures, expressions, environment-aware)
+const FRENCH_ACADEMIC_DYNAMIC_SYSTEM_PROMPT = `You are an expert at creating image prompts that look like DYNAMIC 19TH-CENTURY FRENCH ACADEMIC HISTORY PAINTINGS - with expressive movement, emotional gestures, and environmental storytelling, like the dramatic narrative paintings of Géricault, Delacroix, or David.
+
+CRITICAL: Every prompt MUST begin with this exact prefix:
+"Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, dynamic movement and emotional expression, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette)."
+
+AFTER the prefix, describe the SCENE with EMPHASIS ON:
+1. MOVEMENT and GESTURE - bodies in motion, flowing robes, wind-swept hair, reaching arms
+2. FACIAL EXPRESSIONS - emotional intensity visible in faces: anguish, determination, hope, fear, triumph
+3. BODY LANGUAGE - postures that convey emotional states: leaning forward, recoiling, embracing, gesturing
+4. ENVIRONMENTAL INTERACTION - figures responding to their surroundings, weather effects, dramatic settings
+
+KEY AESTHETIC REQUIREMENTS:
+1. AUTHENTIC 19th-century French academic painting appearance - NOT photography, NOT 3D
+2. Neo-medieval / Gothic Revival aesthetic with DYNAMIC energy
+3. Museum reproduction/scan presentation (flat, even gallery lighting)
+4. Subtle canvas weave, age patina, faint craquelure, slight vignette
+5. EXPRESSIVE but still painterly - controlled technique serving emotional narrative
+6. Environmental elements that enhance drama - storm clouds, wind, dramatic architecture
+7. NO cinematic effects, NO 3D look, NO modern objects
+
+DYNAMIC FRENCH ACADEMIC CHARACTERISTICS:
+- Narrative compositions with figures in MOVEMENT (not static poses)
+- Expressive gestures - outstretched arms, clasped hands, turning bodies
+- Faces showing clear EMOTION - not the calm restraint of formal portraits
+- Flowing fabrics, billowing cloaks, wind-caught garments showing motion
+- Environmental drama - stormy skies, dramatic light breaks, weather effects
+- Multiple figures interacting - emotional exchanges, group dynamics
+- Bodies that twist, reach, lean, and move through space
+- Controlled glazing but with more dramatic tonal contrasts
+
+MOVEMENT AND GESTURE LANGUAGE:
+- "Figure leans forward urgently" / "arm extended in desperate reach"
+- "Robes billow in the wind" / "hair swept by storm"
+- "Body twists in anguish" / "hands raised in supplication"
+- "Figures surge forward" / "crowd presses against barriers"
+- "Cloak caught mid-flutter" / "fabric ripples with movement"
+
+FACIAL EXPRESSION VOCABULARY:
+- "Face contorted in grief" / "eyes wide with terror" / "jaw set in determination"
+- "Brow furrowed in concentration" / "lips parted in cry of anguish"
+- "Expression of desperate hope" / "features softened by compassion"
+- "Eyes burning with resolve" / "face illuminated with sudden realization"
+
+ENVIRONMENTAL STORYTELLING:
+- "Storm clouds gather ominously" / "light breaks dramatically through clouds"
+- "Wind whips through the scene" / "rain lashes the battlements"
+- "Smoke rises from distant fires" / "sea churns violently"
+- "Architecture looms oppressively" / "vast space dwarfs the figures"
+- "Setting sun casts long shadows" / "torchlight flickers against stone walls"
+
+COMPOSITION FOR DYNAMIC SCENES:
+- Diagonal compositions creating energy and movement
+- Multiple figures at different depths - foreground action, background context
+- Environmental elements framing and enhancing the drama
+- Controlled chaos - many elements but unified by academic technique
+- Strong directional movement - eyes and bodies leading across the canvas
+- Dramatic but natural lighting - storm light, torchlight, dramatic sky
+
+PERIOD-ACCURATE ELEMENTS (with dynamic treatment):
+- Flowing medieval/Renaissance garments catching wind and movement
+- Gothic architecture as dramatic backdrop
+- Natural phenomena - storms, wind, dramatic weather
+- Crowds and groups showing unified emotional response
+- Battle or crisis moments frozen at peak drama
+
+ALWAYS END PROMPTS WITH:
+"Dynamic composition with expressive movement and emotional intensity; controlled painterly lighting with atmospheric drama; no cinematic effects, no 3D look, no modern objects — authentic 19th-century French academic oil painting with narrative power and emotional depth."
+
+MODERATION COMPLIANCE:
+- All people fully clothed in period-appropriate attire
+- Show tension and drama through expression, gesture, and environment - not graphic content
+- Depict action through frozen moments, not explicit violence
+- No nudity, gore, or explicit violence
+- Suggest conflict through body language and environmental drama
+
+AVOID:
+- Static, formal portrait poses (use dynamic, narrative poses)
+- Calm, restrained expressions (use visible emotion)
+- Modern photographic or cinematic aesthetic
+- CGI/3D render look
+- Graphic violence or inappropriate content
+- Bland, neutral environments (use dramatic settings)
+
+YOUR TASK:
+For each script chunk, create a DYNAMIC French academic history painting prompt with visible movement, emotional expressions, expressive gestures, and environmental storytelling. Start with the required prefix, describe the scene with emphasis on action and emotion, and end with the "narrative power" disclaimer.`;
 
 // ============ WW2 DOCUMENTARY PHOTOGRAPHY SYSTEM PROMPTS ============
 
@@ -561,6 +733,18 @@ export function ensureCopperplatePrefix(prompt: string): string {
   return `${COPPERPLATE_PREFIX} ${trimmed}`.trim();
 }
 
+export function ensureFrenchAcademicPrefix(prompt: string): string {
+  const trimmed = prompt.trim();
+  if (trimmed.toLowerCase().startsWith('create a 19th-century french academic history painting')) return trimmed;
+  return `${FRENCH_ACADEMIC_PREFIX} ${trimmed}`.trim();
+}
+
+export function ensureFrenchAcademicDynamicPrefix(prompt: string): string {
+  const trimmed = prompt.trim();
+  if (trimmed.toLowerCase().startsWith('create a 19th-century french academic history painting')) return trimmed;
+  return `${FRENCH_ACADEMIC_DYNAMIC_PREFIX} ${trimmed}`.trim();
+}
+
 function sanitizeQuote(text: string): string {
   // Keep exact script text; ensure clean whitespace
   return text.replace(/\s+/g, ' ').trim();
@@ -819,7 +1003,7 @@ export async function generatePromptBatch(
 export async function generatePromptsForChunks(
   chunks: import('./types').ScriptChunk[],
   useAI: boolean = true,
-  style: 'narrative' | 'director-painting' | 'cinematic' | 'archival' | 'copperplate' = 'director-painting',
+  style: 'narrative' | 'director-painting' | 'cinematic' | 'archival' | 'copperplate' | 'french-academic' | 'french-academic-dynamic' = 'director-painting',
   onProgress?: (current: number, total: number) => void,
   parallelRequests: number = 3,
   environment: 'medieval' | 'ww2' | 'custom' = 'medieval',
@@ -845,6 +1029,14 @@ export async function generatePromptsForChunks(
       } else if (style === 'copperplate') {
         // Copperplate etching style
         fallbackTemplate = `Create an 18th-century copperplate etching / line engraving, scanned antique print texture: cross-hatching, stipple shading, uneven ink, faint sepia-gray wash, paper specks. Scene: ${chunk.text}. Figures in stiff tableau poses with period-accurate 18th-century clothing. Strong outlines, engraved shading, no cinematic lighting, no 3D, no modern objects — authentic engraved plate.`;
+        ensurePrefix = (p: string) => p; // Already has full prefix
+      } else if (style === 'french-academic') {
+        // French Academic history painting style
+        fallbackTemplate = `Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette). ${chunk.text}. Formal composition with dignified poses, academic subtlety in rendering faces and hands, controlled glazing, historically plausible architecture and costume details. Lighting is controlled and painterly, with gentle highlights and deep natural shadows; no cinematic effects, no 3D look, no modern objects — authentic 19th-century French academic oil painting with polished finish and restrained drama.`;
+        ensurePrefix = (p: string) => p; // Already has full prefix
+      } else if (style === 'french-academic-dynamic') {
+        // French Academic Dynamic style (more movement and expression)
+        fallbackTemplate = `Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, dynamic movement and emotional expression, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette). ${chunk.text}. Dynamic composition with expressive gestures, visible emotion in faces, flowing garments caught in movement, environmental drama enhancing the narrative. Dynamic composition with expressive movement and emotional intensity; controlled painterly lighting with atmospheric drama; no cinematic effects, no 3D look, no modern objects — authentic 19th-century French academic oil painting with narrative power and emotional depth.`;
         ensurePrefix = (p: string) => p; // Already has full prefix
       } else {
         fallbackTemplate = `${chunk.text}. Dramatic chiaroscuro lighting, warm golden highlights, deep shadows, rich textured brushwork, historically accurate clothing and setting.`;
@@ -878,6 +1070,8 @@ export async function generatePromptsForChunks(
     let isArchivalStyle = false;
     let isCopperplateStyle = false;
     let isCustomStyle = false;
+    let isFrenchAcademicStyle = false;
+    let isFrenchAcademicDynamicStyle = false;
     
     // CRITICAL: Check custom environment FIRST
     if (environment === 'custom' && customSystemPrompt) {
@@ -889,6 +1083,16 @@ export async function generatePromptsForChunks(
       systemPrompt = COPPERPLATE_SYSTEM_PROMPT;
       isCopperplateStyle = true;
       console.log('[Prompt Generator] Using COPPERPLATE style');
+    } else if (style === 'french-academic') {
+      // French Academic style - medieval only
+      systemPrompt = FRENCH_ACADEMIC_SYSTEM_PROMPT;
+      isFrenchAcademicStyle = true;
+      console.log('[Prompt Generator] Using FRENCH ACADEMIC style');
+    } else if (style === 'french-academic-dynamic') {
+      // French Academic Dynamic style - medieval only
+      systemPrompt = FRENCH_ACADEMIC_DYNAMIC_SYSTEM_PROMPT;
+      isFrenchAcademicDynamicStyle = true;
+      console.log('[Prompt Generator] Using FRENCH ACADEMIC DYNAMIC style');
     } else if (environment === 'ww2') {
       if (style === 'archival') {
         systemPrompt = WW2_ARCHIVAL_SYSTEM_PROMPT;
@@ -974,6 +1178,35 @@ REQUIREMENTS:
 - End each prompt with: "Strong outlines, engraved shading, no cinematic lighting, no 3D, no modern objects — authentic engraved plate."
 - Must look like a REAL antique copperplate print, NOT photography or 3D`;
         exampleFormat = `{"chunkId": 1, "prompt": "Create an 18th-century copperplate etching / line engraving, scanned antique print texture: cross-hatching, stipple shading, uneven ink, faint sepia-gray wash, paper specks. Scene: [SCENE DESCRIPTION with period details and visual action descriptions]. Strong outlines, engraved shading, no cinematic lighting, no 3D, no modern objects — authentic engraved plate."}`;
+      } else if (isFrenchAcademicStyle) {
+        styleInstructions = `Create AUTHENTIC 19TH-CENTURY FRENCH ACADEMIC HISTORY PAINTING prompts for each script chunk below.
+
+REQUIREMENTS:
+- Each prompt MUST begin with: "Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette)."
+- AFTER the prefix, describe the specific historical scene with formal academic painting techniques
+- Use academic painting terminology: "controlled glazing", "academic subtlety", "atmospheric perspective", "polished finish"
+- Figures should be dignified, volumetric, classical (three-quarters poses are classic)
+- Faces and hands modeled with academic subtlety - precise anatomy, no caricature
+- Include period-accurate costume details: velvet textures, ruffled collars, heraldic elements
+- Gothic Revival architectural details: diamond-pane leaded windows, carved wood, stone mullions
+- Background scenes should use atmospheric perspective (softened, reduced contrast, miniature figures)
+- End each prompt with: "Lighting is controlled and painterly, with gentle highlights and deep natural shadows; no cinematic effects, no 3D look, no modern objects — authentic 19th-century French academic oil painting with polished finish and restrained drama."
+- Must look like a REAL museum painting, NOT photography or 3D or modern digital art`;
+        exampleFormat = `{"chunkId": 1, "prompt": "Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette). [SCENE DESCRIPTION with formal composition and academic painting techniques]. Lighting is controlled and painterly, with gentle highlights and deep natural shadows; no cinematic effects, no 3D look, no modern objects — authentic 19th-century French academic oil painting with polished finish and restrained drama."}`;
+      } else if (isFrenchAcademicDynamicStyle) {
+        styleInstructions = `Create DYNAMIC 19TH-CENTURY FRENCH ACADEMIC HISTORY PAINTING prompts with movement, gestures, and emotional expression for each script chunk below.
+
+REQUIREMENTS:
+- Each prompt MUST begin with: "Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, dynamic movement and emotional expression, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette)."
+- EMPHASIZE movement and gesture: flowing robes, wind-swept hair, reaching arms, bodies in motion
+- EMPHASIZE facial expressions: visible emotion - anguish, determination, hope, fear, triumph
+- EMPHASIZE body language: postures conveying emotional states - leaning, recoiling, embracing, gesturing
+- EMPHASIZE environmental interaction: figures responding to surroundings, weather effects, dramatic settings
+- Use dynamic composition terminology: "diagonal composition", "expressive gesture", "emotional intensity"
+- Include environmental drama: storm clouds, wind effects, dramatic light breaks
+- End each prompt with: "Dynamic composition with expressive movement and emotional intensity; controlled painterly lighting with atmospheric drama; no cinematic effects, no 3D look, no modern objects — authentic 19th-century French academic oil painting with narrative power and emotional depth."
+- Must look like dramatic narrative paintings of Géricault, Delacroix, or David - NOT photography or 3D`;
+        exampleFormat = `{"chunkId": 1, "prompt": "Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, dynamic movement and emotional expression, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette). [DYNAMIC SCENE with movement, gestures, facial expressions, and environmental drama]. Dynamic composition with expressive movement and emotional intensity; controlled painterly lighting with atmospheric drama; no cinematic effects, no 3D look, no modern objects — authentic 19th-century French academic oil painting with narrative power and emotional depth."}`;
       } else {
         styleInstructions = `Create detailed Rembrandt-style image prompts for each script chunk below.
 
@@ -1067,13 +1300,17 @@ CRITICAL: Ensure all double quotes inside the prompt text are properly escaped a
         const chunk = batchChunks.find(c => c.id === chunkId);
         
         // Select the appropriate prefix function based on style
-        // CRITICAL: Check custom FIRST, then copperplate - same order as system prompt selection
+        // CRITICAL: Check custom FIRST, then special styles - same order as system prompt selection
         let prompt: string;
         if (isCustomStyle) {
           // Custom style - don't enforce any prefix, use the prompt as-is
           prompt = String(item.prompt || '').trim();
         } else if (isCopperplateStyle) {
           prompt = ensureCopperplatePrefix(String(item.prompt || ''));
+        } else if (isFrenchAcademicStyle) {
+          prompt = ensureFrenchAcademicPrefix(String(item.prompt || ''));
+        } else if (isFrenchAcademicDynamicStyle) {
+          prompt = ensureFrenchAcademicDynamicPrefix(String(item.prompt || ''));
         } else if (isArchivalStyle) {
           prompt = ensureWW2ArchivalPrefix(String(item.prompt || ''));
         } else if (environment === 'ww2') {
@@ -1140,6 +1377,12 @@ CRITICAL: Ensure all double quotes inside the prompt text are properly escaped a
         prefix = WW2_PHOTO_PREFIX + ' ';
       } else if (style === 'copperplate') {
         fallbackTemplate = `Create an 18th-century copperplate etching / line engraving, scanned antique print texture: cross-hatching, stipple shading, uneven ink, faint sepia-gray wash, paper specks. Scene: ${chunk.text}. Figures in stiff tableau poses with period-accurate 18th-century clothing. Strong outlines, engraved shading, no cinematic lighting, no 3D, no modern objects — authentic engraved plate.`;
+        prefix = ''; // Already has full prefix
+      } else if (style === 'french-academic') {
+        fallbackTemplate = `Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette). ${chunk.text}. Formal composition with dignified poses, academic subtlety in rendering faces and hands, controlled glazing, historically plausible architecture and costume details. Lighting is controlled and painterly, with gentle highlights and deep natural shadows; no cinematic effects, no 3D look, no modern objects — authentic 19th-century French academic oil painting with polished finish and restrained drama.`;
+        prefix = ''; // Already has full prefix
+      } else if (style === 'french-academic-dynamic') {
+        fallbackTemplate = `Create a 19th-century French academic history painting (École des Beaux-Arts / Academic Classicism) with a neo-medieval / Gothic Revival undertone, dynamic movement and emotional expression, presented as a high-resolution museum reproduction/scan (flat, even gallery lighting; subtle canvas weave; gentle age patina; faint craquelure; slight vignette). ${chunk.text}. Dynamic composition with expressive gestures, visible emotion in faces, flowing garments caught in movement, environmental drama enhancing the narrative. Dynamic composition with expressive movement and emotional intensity; controlled painterly lighting with atmospheric drama; no cinematic effects, no 3D look, no modern objects — authentic 19th-century French academic oil painting with narrative power and emotional depth.`;
         prefix = ''; // Already has full prefix
       } else {
         fallbackTemplate = `${chunk.text}. Dramatic chiaroscuro lighting, warm golden highlights, deep shadows, rich textured brushwork, historically accurate clothing and setting.`;

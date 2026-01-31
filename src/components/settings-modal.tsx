@@ -18,8 +18,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [currentOpenaiKey, setCurrentOpenaiKey] = useState('');
   const [showClearDialog, setShowClearDialog] = useState(false);
-  const [clearTarget, setClearTarget] = useState<'fal' | 'openai' | 'openrouter' | 'pexels' | 'pixabay'>('fal');
+  const [clearTarget, setClearTarget] = useState<'fal' | 'openai' | 'openrouter' | 'pexels' | 'pixabay' | 'elevenlabs'>('fal');
   const [openrouterApiKey, setOpenrouterApiKey] = useState('');
+  // ElevenLabs API key for text-to-speech
+  const [elevenlabsApiKey, setElevenlabsApiKey] = useState('');
+  const [currentElevenlabsKey, setCurrentElevenlabsKey] = useState('');
   const [currentOpenrouterKey, setCurrentOpenrouterKey] = useState('');
   const [openrouterModelId, setOpenrouterModelId] = useState('');
   const [currentOpenrouterModelId, setCurrentOpenrouterModelId] = useState('');
@@ -45,6 +48,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       const savedOpenrouterModel = localStorage.getItem('openrouter_model_id') || '';
       const savedPexels = localStorage.getItem('pexels_api_key') || '';
       const savedPixabay = localStorage.getItem('pixabay_api_key') || '';
+      const savedElevenlabs = localStorage.getItem('elevenlabs_api_key') || '';
       setCurrentKey(savedFal);
       setApiKey(savedFal);
       setCurrentOpenaiKey(savedOpenai);
@@ -57,6 +61,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setPexelsApiKey(savedPexels);
       setCurrentPixabayKey(savedPixabay);
       setPixabayApiKey(savedPixabay);
+      setCurrentElevenlabsKey(savedElevenlabs);
+      setElevenlabsApiKey(savedElevenlabs);
     }
   }, [isOpen]);
 
@@ -103,6 +109,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         localStorage.removeItem('pixabay_api_key');
       }
       setCurrentPixabayKey(pixabayApiKey.trim());
+
+      // Save ElevenLabs API key
+      if (elevenlabsApiKey?.trim()) {
+        localStorage.setItem('elevenlabs_api_key', elevenlabsApiKey.trim());
+      } else {
+        localStorage.removeItem('elevenlabs_api_key');
+      }
+      setCurrentElevenlabsKey(elevenlabsApiKey.trim());
       
       // Configure fal.ai client immediately
       if (apiKey) {
@@ -141,12 +155,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         localStorage.removeItem('pixabay_api_key');
         setPixabayApiKey('');
         setCurrentPixabayKey('');
+      } else if (clearTarget === 'elevenlabs') {
+        localStorage.removeItem('elevenlabs_api_key');
+        setElevenlabsApiKey('');
+        setCurrentElevenlabsKey('');
       }
       setShowClearDialog(false);
     }
   }
 
-  function openClearDialog(target: 'fal' | 'openai' | 'openrouter' | 'pexels' | 'pixabay') {
+  function openClearDialog(target: 'fal' | 'openai' | 'openrouter' | 'pexels' | 'pixabay' | 'elevenlabs') {
     setClearTarget(target);
     setShowClearDialog(true);
   }
@@ -281,6 +299,37 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </div>
                 )}
               </div>
+
+              {/* ElevenLabs API Key */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  ElevenLabs API Key
+                </label>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Text-to-Speech Audio (Optional)</p>
+                <Input
+                  type="password"
+                  placeholder="Enter your ElevenLabs API key..."
+                  value={elevenlabsApiKey}
+                  onChange={(e) => setElevenlabsApiKey(e.target.value)}
+                />
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                  Get key at{' '}
+                  <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    elevenlabs.io/app/settings/api-keys
+                  </a>
+                </p>
+                {currentElevenlabsKey && (
+                  <div className="mt-2 p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Key className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
+                      <span className="text-xs text-indigo-800 dark:text-indigo-200">{currentElevenlabsKey.substring(0, 10)}...</span>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => openClearDialog('elevenlabs')} className="h-5 w-5 p-0">
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Right Column */}
@@ -376,11 +425,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 clearTarget === 'fal' ? 'fal.ai' : 
                 clearTarget === 'openai' ? 'OpenAI' : 
                 clearTarget === 'openrouter' ? 'OpenRouter' :
-                clearTarget === 'pexels' ? 'Pexels' : 'Pixabay'
+                clearTarget === 'pexels' ? 'Pexels' : 
+                clearTarget === 'pixabay' ? 'Pixabay' : 'ElevenLabs'
               } API key? 
               {clearTarget === 'fal' ? "You'll need it for Minimax/Imagen 4/Seedream/Nano Banana." : 
                clearTarget === 'openai' ? "You'll need it for GPT Image 1." : 
                clearTarget === 'openrouter' ? "You'll need it for Claude Sonnet prompt generation." :
+               clearTarget === 'elevenlabs' ? "You'll need it for text-to-speech audio generation." :
                "This is optional - Wikimedia Commons (primary) doesn't require a key."}
             </AlertDialogDescription>
           </AlertDialogHeader>

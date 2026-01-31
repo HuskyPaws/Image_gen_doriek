@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { SettingsModal } from './settings-modal';
-import { Settings, Scissors, Globe, Eraser } from 'lucide-react';
+import { Settings, Scissors, Globe, Eraser, Image } from 'lucide-react';
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -52,6 +52,15 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 >
                   <Globe className="h-4 w-4 mr-2" />
                   Stock Images
+                </Button>
+              </Link>
+              <Link href="/tools/thumbnail-tester">
+                <Button
+                  variant="outline"
+                  size="sm"
+                >
+                  <Image className="h-4 w-4 mr-2" />
+                  Thumbnail Tester
                 </Button>
               </Link>
               <Button

@@ -14,7 +14,32 @@ import { ScriptChunk, ChunkPrompt, ChunkKeywords } from '@/lib/types';
 import { chunkScript } from '@/lib/script-chunker';
 import { generatePromptsForChunks, generateKeywordsForChunks, generateCustomStylePrompt } from '@/lib/prompt-generator';
 import { createProject } from '@/lib/storage';
-import { ArrowLeft, FileText, Scissors, Wand2, ImageIcon, Download, CheckCircle, Loader2, Edit3, ChevronDown, ChevronUp, TestTube, FolderPlus, Trash2, Split, GitMerge, Plus, Check, X, Save, Search, Tags } from 'lucide-react';
+import { ArrowLeft, FileText, Scissors, Wand2, ImageIcon, Download, CheckCircle, Loader2, Edit3, ChevronDown, ChevronUp, TestTube, FolderPlus, Trash2, Split, GitMerge, Plus, Check, X, Save, Search, Tags, Volume2, Play, Pause, Music, Star, Settings2 } from 'lucide-react';
+import { AudioChunk, ElevenLabsVoice } from '@/lib/types';
+
+// Audio preset type for saving/loading settings
+interface AudioPreset {
+  voiceId: string;
+  modelId: string;
+  stability: number;
+  similarity: number;
+  style: number;
+  speed: number;
+  useStitching: boolean;
+  stitchingDepth: number;
+  outputFormat?: string;
+}
+import { 
+  fetchVoices, 
+  generateSpeechForChunks, 
+  combineAudioChunks, 
+  downloadAudio, 
+  cleanupAudioChunks,
+  getElevenLabsApiKey,
+  getFileExtension,
+  POPULAR_VOICES,
+  ELEVENLABS_MODELS
+} from '@/lib/elevenlabs';
 
 export default function ScriptChunkerPage() {
   const [scriptText, setScriptText] = useState('');
@@ -37,7 +62,7 @@ export default function ScriptChunkerPage() {
     addedWords: string[];
   } | null>(null);
   const [testChunkCount, setTestChunkCount] = useState(10);
-  const [promptStyle, setPromptStyle] = useState<'narrative' | 'director-painting' | 'cinematic' | 'archival' | 'copperplate'>('director-painting');
+  const [promptStyle, setPromptStyle] = useState<'narrative' | 'director-painting' | 'cinematic' | 'archival' | 'copperplate' | 'french-academic' | 'french-academic-dynamic'>('director-painting');
   const [environment, setEnvironment] = useState<'medieval' | 'ww2' | 'custom'>('medieval');
   const [customStylePrompt, setCustomStylePrompt] = useState('');
   const [styleGeneratorInput, setStyleGeneratorInput] = useState('');
@@ -55,6 +80,32 @@ export default function ScriptChunkerPage() {
   const [parallelRequests, setParallelRequests] = useState(3);
   const [generationMode, setGenerationMode] = useState<'prompts' | 'keywords'>('prompts');
   const [keywords, setKeywords] = useState<ChunkKeywords[]>([]);
+  
+  // Audio generation state (ElevenLabs)
+  const [showAudioSection, setShowAudioSection] = useState(false);
+  const [audioChunks, setAudioChunks] = useState<AudioChunk[]>([]);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [audioProgress, setAudioProgress] = useState({ current: 0, total: 0 });
+  const [selectedVoiceId, setSelectedVoiceId] = useState(POPULAR_VOICES[0].voice_id);
+  const [availableVoices, setAvailableVoices] = useState<ElevenLabsVoice[]>([]);
+  const [isLoadingVoices, setIsLoadingVoices] = useState(false);
+  const [selectedAudioModel, setSelectedAudioModel] = useState(ELEVENLABS_MODELS.MULTILINGUAL_V2);
+  const [playingChunkId, setPlayingChunkId] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Voice settings
+  const [voiceStability, setVoiceStability] = useState(0.5);
+  const [voiceSimilarity, setVoiceSimilarity] = useState(0.75);
+  const [voiceStyle, setVoiceStyle] = useState(0.0);
+  const [voiceSpeed, setVoiceSpeed] = useState(1.0);
+  const [showAdvancedVoiceSettings, setShowAdvancedVoiceSettings] = useState(false);
+  const [useRequestStitching, setUseRequestStitching] = useState(true);
+  const [stitchingDepth, setStitchingDepth] = useState(1); // How many previous IDs to use (1-3)
+  const [audioOutputFormat, setAudioOutputFormat] = useState('mp3_44100_128');
+  // Saved audio settings and favorite voices
+  const [favoriteVoices, setFavoriteVoices] = useState<string[]>([]);
+  const [savedAudioPresets, setSavedAudioPresets] = useState<{name: string; settings: AudioPreset}[]>([]);
+  const [showSavePresetDialog, setShowSavePresetDialog] = useState(false);
+  const [presetName, setPresetName] = useState('');
 
   // Check for imported script from Script Writer
   useEffect(() => {
@@ -81,8 +132,8 @@ export default function ScriptChunkerPage() {
 
   // Reset prompt style when switching environments to avoid invalid combinations
   useEffect(() => {
-    // If switching to WW2 and copperplate is selected, reset to director-painting
-    if (environment === 'ww2' && promptStyle === 'copperplate') {
+    // If switching to WW2 and medieval-only styles are selected, reset to director-painting
+    if (environment === 'ww2' && (promptStyle === 'copperplate' || promptStyle === 'french-academic' || promptStyle === 'french-academic-dynamic')) {
       setPromptStyle('director-painting');
     }
     // If switching to medieval and archival is selected, reset to director-painting
@@ -90,6 +141,38 @@ export default function ScriptChunkerPage() {
       setPromptStyle('director-painting');
     }
   }, [environment, promptStyle]);
+
+  // Cleanup audio URLs on unmount
+  useEffect(() => {
+    return () => {
+      cleanupAudioChunks(audioChunks);
+    };
+  }, [audioChunks]);
+
+  // Load ElevenLabs voices when audio section is opened
+  useEffect(() => {
+    if (showAudioSection && availableVoices.length === 0 && !isLoadingVoices) {
+      loadVoices();
+    }
+  }, [showAudioSection]);
+
+  // Load favorite voices and audio presets from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedFavorites = localStorage.getItem('elevenlabs_favorite_voices');
+        if (savedFavorites) {
+          setFavoriteVoices(JSON.parse(savedFavorites));
+        }
+        const savedPresets = localStorage.getItem('elevenlabs_audio_presets');
+        if (savedPresets) {
+          setSavedAudioPresets(JSON.parse(savedPresets));
+        }
+      } catch (e) {
+        console.error('Failed to load audio settings:', e);
+      }
+    }
+  }, []);
 
   const wordCount = scriptText.trim().split(/\s+/).filter(w => w.length > 0).length;
   const paragraphCount = scriptText.trim().split(/\n\n+/).filter(p => p.trim().length > 0).length;
@@ -267,6 +350,223 @@ export default function ScriptChunkerPage() {
       localStorage.setItem('customImageStyles', JSON.stringify(updatedStyles));
     } catch (e) {
       console.error('Failed to delete style:', e);
+    }
+  }
+
+  // Audio generation functions
+  async function loadVoices() {
+    if (!getElevenLabsApiKey()) return;
+    
+    setIsLoadingVoices(true);
+    try {
+      const voices = await fetchVoices();
+      setAvailableVoices(voices);
+    } catch (error) {
+      console.error('Failed to load voices:', error);
+      // Don't show alert - just use popular voices as fallback
+    } finally {
+      setIsLoadingVoices(false);
+    }
+  }
+
+  function toggleFavoriteVoice(voiceId: string) {
+    const updated = favoriteVoices.includes(voiceId)
+      ? favoriteVoices.filter(id => id !== voiceId)
+      : [...favoriteVoices, voiceId];
+    
+    setFavoriteVoices(updated);
+    try {
+      localStorage.setItem('elevenlabs_favorite_voices', JSON.stringify(updated));
+    } catch (e) {
+      console.error('Failed to save favorites:', e);
+    }
+  }
+
+  function getCurrentAudioPreset(): AudioPreset {
+    return {
+      voiceId: selectedVoiceId,
+      modelId: selectedAudioModel,
+      stability: voiceStability,
+      similarity: voiceSimilarity,
+      style: voiceStyle,
+      speed: voiceSpeed,
+      useStitching: useRequestStitching,
+      stitchingDepth: stitchingDepth,
+      outputFormat: audioOutputFormat,
+    };
+  }
+
+  function handleSaveAudioPreset() {
+    if (!presetName.trim()) return;
+    
+    const newPreset = {
+      name: presetName.trim(),
+      settings: getCurrentAudioPreset(),
+    };
+    
+    // Check if preset with same name exists
+    const existingIndex = savedAudioPresets.findIndex(
+      p => p.name.toLowerCase() === newPreset.name.toLowerCase()
+    );
+    
+    let updated: typeof savedAudioPresets;
+    if (existingIndex >= 0) {
+      updated = [...savedAudioPresets];
+      updated[existingIndex] = newPreset;
+    } else {
+      updated = [...savedAudioPresets, newPreset];
+    }
+    
+    setSavedAudioPresets(updated);
+    try {
+      localStorage.setItem('elevenlabs_audio_presets', JSON.stringify(updated));
+    } catch (e) {
+      console.error('Failed to save preset:', e);
+    }
+    
+    setShowSavePresetDialog(false);
+    setPresetName('');
+  }
+
+  function handleLoadAudioPreset(preset: AudioPreset) {
+    setSelectedVoiceId(preset.voiceId);
+    setSelectedAudioModel(preset.modelId);
+    setVoiceStability(preset.stability);
+    setVoiceSimilarity(preset.similarity);
+    setVoiceStyle(preset.style);
+    setVoiceSpeed(preset.speed);
+    setUseRequestStitching(preset.useStitching);
+    setStitchingDepth(preset.stitchingDepth);
+    setAudioOutputFormat(preset.outputFormat || 'mp3_44100_128');
+  }
+
+  function handleDeleteAudioPreset(name: string) {
+    const updated = savedAudioPresets.filter(p => p.name !== name);
+    setSavedAudioPresets(updated);
+    try {
+      localStorage.setItem('elevenlabs_audio_presets', JSON.stringify(updated));
+    } catch (e) {
+      console.error('Failed to delete preset:', e);
+    }
+  }
+
+  // Helper to get voice name by ID
+  function getVoiceName(voiceId: string): string {
+    const popular = POPULAR_VOICES.find(v => v.voice_id === voiceId);
+    if (popular) return popular.name;
+    const custom = availableVoices.find(v => v.voice_id === voiceId);
+    if (custom) return custom.name;
+    return voiceId.substring(0, 8) + '...';
+  }
+
+  async function handleGenerateAudio() {
+    if (chunks.length === 0) return;
+    
+    const apiKey = getElevenLabsApiKey();
+    if (!apiKey) {
+      alert('Please add your ElevenLabs API key in Settings to generate audio.');
+      return;
+    }
+
+    setIsGeneratingAudio(true);
+    setAudioProgress({ current: 0, total: chunks.length });
+    
+    // Clean up previous audio
+    cleanupAudioChunks(audioChunks);
+    setAudioChunks([]);
+
+    try {
+      const results = await generateSpeechForChunks(
+        chunks,
+        {
+          voiceId: selectedVoiceId,
+          modelId: selectedAudioModel,
+          outputFormat: audioOutputFormat,
+          voiceSettings: {
+            stability: voiceStability,
+            similarity_boost: voiceSimilarity,
+            style: voiceStyle,
+            use_speaker_boost: true,
+            speed: voiceSpeed,
+          },
+          useStitching: useRequestStitching,
+          stitchingDepth: stitchingDepth,
+        },
+        (current, total, chunk) => {
+          setAudioProgress({ current, total });
+          setAudioChunks(prev => {
+            const existing = prev.findIndex(c => c.chunkId === chunk.chunkId);
+            if (existing >= 0) {
+              const updated = [...prev];
+              updated[existing] = chunk;
+              return updated;
+            }
+            return [...prev, chunk];
+          });
+        }
+      );
+
+      setAudioChunks(results);
+      
+      const successCount = results.filter(r => r.status === 'completed').length;
+      const failCount = results.filter(r => r.status === 'failed').length;
+      
+      if (failCount > 0) {
+        alert(`Audio generation completed: ${successCount} successful, ${failCount} failed.`);
+      }
+    } catch (error) {
+      console.error('Audio generation failed:', error);
+      alert(`Audio generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGeneratingAudio(false);
+      setAudioProgress({ current: 0, total: 0 });
+    }
+  }
+
+  async function handleDownloadAllAudio() {
+    const completedChunks = audioChunks.filter(c => c.status === 'completed' && c.audioBlob);
+    if (completedChunks.length === 0) {
+      alert('No audio to download. Generate audio first.');
+      return;
+    }
+
+    try {
+      const combinedBlob = await combineAudioChunks(completedChunks, audioOutputFormat);
+      const timestamp = new Date().toISOString().split('T')[0];
+      const extension = getFileExtension(audioOutputFormat);
+      downloadAudio(combinedBlob, `script-narration-${timestamp}.${extension}`);
+    } catch (error) {
+      console.error('Failed to combine audio:', error);
+      alert(`Failed to download audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  function handlePlayChunk(chunkId: number) {
+    const chunk = audioChunks.find(c => c.chunkId === chunkId);
+    if (!chunk?.audioUrl) return;
+
+    if (playingChunkId === chunkId) {
+      // Stop playing
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setPlayingChunkId(null);
+    } else {
+      // Stop any current playback
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      
+      // Play new chunk
+      const audio = new Audio(chunk.audioUrl);
+      audio.onended = () => {
+        setPlayingChunkId(null);
+        audioRef.current = null;
+      };
+      audio.play();
+      audioRef.current = audio;
+      setPlayingChunkId(chunkId);
     }
   }
 
@@ -1170,6 +1470,517 @@ ${scriptText.trim()}`}
               </Card>
             )}
 
+            {/* Audio Generation Section (Optional) */}
+            <Card className="border-2 border-indigo-500/50 bg-indigo-950/10">
+              <button
+                onClick={() => setShowAudioSection(!showAudioSection)}
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-indigo-950/20 transition-colors rounded-t-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <Volume2 className="h-5 w-5 text-indigo-400" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-indigo-300">Audio Narration (Optional)</h3>
+                    <p className="text-xs text-slate-400">Generate text-to-speech audio using ElevenLabs</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {audioChunks.filter(c => c.status === 'completed').length > 0 && (
+                    <Badge className="bg-green-600 text-xs">
+                      {audioChunks.filter(c => c.status === 'completed').length} audio clips
+                    </Badge>
+                  )}
+                  {showAudioSection ? (
+                    <ChevronUp className="h-5 w-5 text-indigo-400" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-indigo-400" />
+                  )}
+                </div>
+              </button>
+              
+              {showAudioSection && (
+                <CardContent className="pt-0 pb-4 space-y-4">
+                  {!getElevenLabsApiKey() ? (
+                    <Alert className="bg-amber-950 border-amber-800">
+                      <Volume2 className="h-4 w-4 text-amber-400" />
+                      <AlertDescription className="text-amber-300 text-sm">
+                        ElevenLabs API key not configured. Add it in Settings to generate audio narration.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <>
+                      {/* Saved Presets Section */}
+                      {savedAudioPresets.length > 0 && (
+                        <div className="p-3 bg-slate-800 rounded-lg border border-green-500/50">
+                          <label className="text-sm font-medium text-green-300 mb-2 block flex items-center gap-2">
+                            <Settings2 className="h-4 w-4" />
+                            Saved Presets ({savedAudioPresets.length})
+                          </label>
+                          <div className="flex gap-2 flex-wrap">
+                            {savedAudioPresets.map((preset) => (
+                              <div 
+                                key={preset.name}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all"
+                              >
+                                <button
+                                  onClick={() => handleLoadAudioPreset(preset.settings)}
+                                  className="flex-1 text-left"
+                                  title={`Voice: ${getVoiceName(preset.settings.voiceId)}`}
+                                >
+                                  {preset.name}
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`Delete preset "${preset.name}"?`)) {
+                                      handleDeleteAudioPreset(preset.name);
+                                    }
+                                  }}
+                                  className="ml-1 p-0.5 rounded hover:bg-red-500/30 transition-colors"
+                                  title="Delete preset"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Voice and Model Selection */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Voice Selection */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-300">Voice</label>
+                          <div className="flex gap-2">
+                            <select
+                              value={selectedVoiceId}
+                              onChange={(e) => setSelectedVoiceId(e.target.value)}
+                              className="flex-1 px-3 py-2 bg-slate-800 text-slate-200 rounded border border-slate-600 text-sm"
+                            >
+                              {/* Favorite Voices */}
+                              {favoriteVoices.length > 0 && (
+                                <optgroup label="⭐ Favorites">
+                                  {favoriteVoices.map((voiceId) => {
+                                    const popular = POPULAR_VOICES.find(v => v.voice_id === voiceId);
+                                    const custom = availableVoices.find(v => v.voice_id === voiceId);
+                                    const name = popular?.name || custom?.name || voiceId;
+                                    const desc = popular?.description || custom?.category || '';
+                                    return (
+                                      <option key={voiceId} value={voiceId}>
+                                        ⭐ {name} {desc ? `- ${desc}` : ''}
+                                      </option>
+                                    );
+                                  })}
+                                </optgroup>
+                              )}
+                              <optgroup label="Popular Voices">
+                                {POPULAR_VOICES.map((voice) => (
+                                  <option key={voice.voice_id} value={voice.voice_id}>
+                                    {favoriteVoices.includes(voice.voice_id) ? '⭐ ' : ''}{voice.name} - {voice.description}
+                                  </option>
+                                ))}
+                              </optgroup>
+                              {availableVoices.length > 0 && (
+                                <optgroup label="Your Voices">
+                                  {availableVoices
+                                    .filter(v => !POPULAR_VOICES.find(pv => pv.voice_id === v.voice_id))
+                                    .map((voice) => (
+                                      <option key={voice.voice_id} value={voice.voice_id}>
+                                        {favoriteVoices.includes(voice.voice_id) ? '⭐ ' : ''}{voice.name} {voice.category ? `(${voice.category})` : ''}
+                                      </option>
+                                    ))}
+                                </optgroup>
+                              )}
+                            </select>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toggleFavoriteVoice(selectedVoiceId)}
+                              className={`px-2 ${favoriteVoices.includes(selectedVoiceId) ? 'border-yellow-500 text-yellow-400' : 'border-slate-600'}`}
+                              title={favoriteVoices.includes(selectedVoiceId) ? 'Remove from favorites' : 'Add to favorites'}
+                            >
+                              <Star className={`h-4 w-4 ${favoriteVoices.includes(selectedVoiceId) ? 'fill-yellow-400' : ''}`} />
+                            </Button>
+                          </div>
+                          {isLoadingVoices && (
+                            <p className="text-xs text-slate-400 flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Loading your voices...
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Model Selection */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-slate-300">Model</label>
+                          <select
+                            value={selectedAudioModel}
+                            onChange={(e) => setSelectedAudioModel(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-800 text-slate-200 rounded border border-slate-600 text-sm"
+                          >
+                            <option value={ELEVENLABS_MODELS.MULTILINGUAL_V2}>
+                              Multilingual v2 (Best quality, supports 29 languages)
+                            </option>
+                            <option value={ELEVENLABS_MODELS.TURBO_V2_5}>
+                              Turbo v2.5 (Faster, English-focused)
+                            </option>
+                            <option value={ELEVENLABS_MODELS.FLASH_V2_5}>
+                              Flash v2.5 (Fastest, lowest latency)
+                            </option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Output Format Selection */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">Output Format</label>
+                        <select
+                          value={audioOutputFormat}
+                          onChange={(e) => setAudioOutputFormat(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-800 text-slate-200 rounded border border-slate-600 text-sm"
+                        >
+                          <optgroup label="WAV / PCM (Uncompressed - Highest Quality)">
+                            <option value="pcm_44100">WAV 44.1kHz (CD Quality) - Largest files</option>
+                            <option value="pcm_24000">WAV 24kHz - Smaller files</option>
+                            <option value="pcm_22050">WAV 22kHz</option>
+                            <option value="pcm_16000">WAV 16kHz - Smallest uncompressed</option>
+                          </optgroup>
+                          <optgroup label="MP3 (Compressed)">
+                            <option value="mp3_44100_192">MP3 192kbps (High quality)</option>
+                            <option value="mp3_44100_128">MP3 128kbps (Good quality) - Recommended</option>
+                            <option value="mp3_44100_64">MP3 64kbps (Medium quality)</option>
+                            <option value="mp3_22050_32">MP3 32kbps (Low quality, small files)</option>
+                          </optgroup>
+                        </select>
+                        <p className="text-xs text-slate-500">
+                          {audioOutputFormat.startsWith('pcm_') 
+                            ? '🎵 WAV: Uncompressed audio, best for editing. Larger file sizes.'
+                            : '🎵 MP3: Compressed audio, good for sharing. Smaller file sizes.'}
+                        </p>
+                      </div>
+
+                      {/* Advanced Voice Settings */}
+                      <div className="border border-slate-700 rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => setShowAdvancedVoiceSettings(!showAdvancedVoiceSettings)}
+                          className="w-full p-3 bg-slate-800 flex items-center justify-between text-left hover:bg-slate-750 transition-colors"
+                        >
+                          <span className="text-sm font-medium text-slate-300">
+                            Advanced Voice Settings
+                          </span>
+                          {showAdvancedVoiceSettings ? (
+                            <ChevronUp className="h-4 w-4 text-slate-400" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-slate-400" />
+                          )}
+                        </button>
+                        {showAdvancedVoiceSettings && (
+                          <div className="p-4 space-y-4 bg-slate-900/50">
+                            {/* Stability */}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-slate-300">
+                                  Stability
+                                </label>
+                                <span className="text-xs text-slate-400 font-mono">{voiceStability.toFixed(2)}</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={voiceStability}
+                                onChange={(e) => setVoiceStability(parseFloat(e.target.value))}
+                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                              />
+                              <p className="text-xs text-slate-500">
+                                Lower = more expressive & variable. Higher = more consistent & stable.
+                              </p>
+                            </div>
+
+                            {/* Similarity Boost */}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-slate-300">
+                                  Similarity Boost
+                                </label>
+                                <span className="text-xs text-slate-400 font-mono">{voiceSimilarity.toFixed(2)}</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={voiceSimilarity}
+                                onChange={(e) => setVoiceSimilarity(parseFloat(e.target.value))}
+                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                              />
+                              <p className="text-xs text-slate-500">
+                                How closely the output matches the original voice. Higher = closer match.
+                              </p>
+                            </div>
+
+                            {/* Style Exaggeration */}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-slate-300">
+                                  Style Exaggeration
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="1"
+                                    step="0.005"
+                                    value={voiceStyle}
+                                    onChange={(e) => setVoiceStyle(Math.min(1, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                    className="w-16 px-2 py-0.5 text-xs font-mono bg-slate-800 border border-slate-600 rounded text-right"
+                                  />
+                                </div>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.005"
+                                value={voiceStyle}
+                                onChange={(e) => setVoiceStyle(parseFloat(e.target.value))}
+                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                              />
+                              <p className="text-xs text-slate-500">
+                                Amplifies the voice&apos;s original style. Use 0 for narration, higher for dramatic delivery.
+                              </p>
+                            </div>
+
+                            {/* Speed */}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-slate-300">
+                                  Speed
+                                </label>
+                                <span className="text-xs text-slate-400 font-mono">{voiceSpeed.toFixed(2)}x</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0.5"
+                                max="2"
+                                step="0.05"
+                                value={voiceSpeed}
+                                onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
+                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                              />
+                              <p className="text-xs text-slate-500">
+                                Playback speed. 1.0 = normal, lower = slower, higher = faster.
+                              </p>
+                            </div>
+
+                            {/* Request Stitching Toggle */}
+                            <div className="pt-3 border-t border-slate-700 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <label className="text-sm font-medium text-slate-300">
+                                    Request Stitching
+                                  </label>
+                                  <p className="text-xs text-slate-500">
+                                    Links chunks for smoother prosody, but may cause volume decay
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => setUseRequestStitching(!useRequestStitching)}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                    useRequestStitching ? 'bg-indigo-600' : 'bg-slate-600'
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                      useRequestStitching ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+
+                              {useRequestStitching && (
+                                <div className="space-y-2 pl-4 border-l-2 border-indigo-500/30">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-sm font-medium text-slate-300">
+                                      Stitching Depth
+                                    </label>
+                                    <span className="text-xs text-slate-400 font-mono">{stitchingDepth} chunk{stitchingDepth > 1 ? 's' : ''}</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="1"
+                                    max="3"
+                                    step="1"
+                                    value={stitchingDepth}
+                                    onChange={(e) => setStitchingDepth(parseInt(e.target.value))}
+                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                  />
+                                  <p className="text-xs text-slate-500">
+                                    {stitchingDepth === 1 && 'Minimal stitching - reduces volume decay, slight prosody variations'}
+                                    {stitchingDepth === 2 && 'Balanced - moderate continuity with some volume consistency'}
+                                    {stitchingDepth === 3 && 'Maximum continuity - smoothest prosody but highest volume decay risk'}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Save Preset & Reset Buttons */}
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowSavePresetDialog(true)}
+                                className="flex-1 border-green-500 text-green-400 hover:bg-green-950"
+                              >
+                                <Save className="h-3 w-3 mr-1" />
+                                Save Preset
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setVoiceStability(0.5);
+                                  setVoiceSimilarity(0.75);
+                                  setVoiceStyle(0.0);
+                                  setVoiceSpeed(1.0);
+                                  setUseRequestStitching(true);
+                                  setStitchingDepth(1);
+                                  setAudioOutputFormat('mp3_44100_128');
+                                }}
+                                className="flex-1"
+                              >
+                                Reset to Defaults
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Request Stitching Info */}
+                      {useRequestStitching ? (
+                        <Alert className="bg-blue-950 border-blue-800">
+                          <Music className="h-4 w-4 text-blue-400" />
+                          <AlertDescription className="text-blue-300 text-sm">
+                            <strong>Stitching Enabled (Depth: {stitchingDepth}):</strong> Each chunk references the previous {stitchingDepth} chunk{stitchingDepth > 1 ? 's' : ''} for smoother prosody. 
+                            If you notice volume decreasing over time, try reducing the depth to 1 or disabling stitching in Advanced Settings.
+                          </AlertDescription>
+                        </Alert>
+                      ) : (
+                        <Alert className="bg-amber-950 border-amber-800">
+                          <Music className="h-4 w-4 text-amber-400" />
+                          <AlertDescription className="text-amber-300 text-sm">
+                            <strong>Stitching Disabled:</strong> Each chunk is generated independently. Volume will stay consistent, but there may be slight prosody variations between chunks.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {/* Generate Button */}
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleGenerateAudio}
+                          disabled={isGeneratingAudio || chunks.length === 0}
+                          className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                        >
+                          {isGeneratingAudio ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Generating Audio ({audioProgress.current}/{audioProgress.total})...
+                            </>
+                          ) : (
+                            <>
+                              <Volume2 className="h-4 w-4 mr-2" />
+                              Generate Audio for {chunks.length} Chunks
+                            </>
+                          )}
+                        </Button>
+                        
+                        {audioChunks.filter(c => c.status === 'completed').length > 0 && (
+                          <Button
+                            onClick={handleDownloadAllAudio}
+                            variant="outline"
+                            className="border-green-500 text-green-400 hover:bg-green-950"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download All
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Audio Progress */}
+                      {isGeneratingAudio && audioProgress.total > 0 && (
+                        <div className="space-y-2">
+                          <Progress 
+                            value={(audioProgress.current / audioProgress.total) * 100} 
+                            className="h-2"
+                          />
+                          <p className="text-xs text-center text-indigo-400">
+                            {Math.round((audioProgress.current / audioProgress.total) * 100)}% complete
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Audio Chunks Preview */}
+                      {audioChunks.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium text-slate-300">Generated Audio Clips</h4>
+                          <div className="border rounded-lg overflow-hidden max-h-[200px] overflow-y-auto">
+                            <div className="divide-y divide-slate-700">
+                              {audioChunks.map((chunk) => (
+                                <div
+                                  key={chunk.chunkId}
+                                  className="p-2 flex items-center justify-between hover:bg-slate-800/50"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Badge 
+                                      className={
+                                        chunk.status === 'completed' ? 'bg-green-600' :
+                                        chunk.status === 'generating' ? 'bg-yellow-600' :
+                                        chunk.status === 'failed' ? 'bg-red-600' : 'bg-slate-600'
+                                      }
+                                    >
+                                      {chunk.chunkId}
+                                    </Badge>
+                                    <span className="text-xs text-slate-400 truncate max-w-[200px]">
+                                      {chunk.text.substring(0, 50)}...
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {chunk.status === 'generating' && (
+                                      <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
+                                    )}
+                                    {chunk.status === 'completed' && chunk.audioUrl && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handlePlayChunk(chunk.chunkId)}
+                                        className="h-7 w-7 p-0"
+                                      >
+                                        {playingChunkId === chunk.chunkId ? (
+                                          <Pause className="h-4 w-4 text-indigo-400" />
+                                        ) : (
+                                          <Play className="h-4 w-4 text-indigo-400" />
+                                        )}
+                                      </Button>
+                                    )}
+                                    {chunk.status === 'failed' && (
+                                      <span className="text-xs text-red-400" title={chunk.error}>
+                                        Failed
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+
             {/* Generation Mode Selector */}
             <Card className="border-2 border-cyan-500 bg-cyan-950/20">
               <CardHeader className="pb-3">
@@ -1554,7 +2365,7 @@ AVOID:
                 <CardTitle className="text-sm font-semibold text-amber-400">Prompt Style</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className={`grid grid-cols-1 gap-3 ${environment === 'ww2' ? 'md:grid-cols-2' : 'md:grid-cols-4'}`}>
+                <div className={`grid grid-cols-1 gap-3 ${environment === 'ww2' ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
                   {/* Style 1: Narrative */}
                   <button
                     onClick={() => setPromptStyle('narrative')}
@@ -1652,7 +2463,53 @@ AVOID:
                     </button>
                   )}
 
-                  {/* Style 5: Archival Photo - WW2 Only */}
+                  {/* Style 5: French Academic - MEDIEVAL ONLY */}
+                  {environment === 'medieval' && (
+                    <button
+                      onClick={() => setPromptStyle('french-academic')}
+                      className={`p-4 rounded-lg border-2 transition-all text-left ${
+                        promptStyle === 'french-academic'
+                          ? 'border-amber-500 bg-amber-950/50'
+                          : 'border-slate-700 bg-slate-900 hover:border-amber-700'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-semibold text-slate-100">French Academic</h4>
+                        {promptStyle === 'french-academic' && (
+                          <CheckCircle className="h-5 w-5 text-amber-500" />
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        <Badge className="bg-purple-600 text-xs mb-1">19th Century</Badge><br />
+                        École des Beaux-Arts style museum painting. Neo-medieval/Gothic Revival undertone, canvas weave texture, craquelure, formal compositions. Dignified academic portraiture with polished finish.
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Style 6: French Academic Dynamic - MEDIEVAL ONLY */}
+                  {environment === 'medieval' && (
+                    <button
+                      onClick={() => setPromptStyle('french-academic-dynamic')}
+                      className={`p-4 rounded-lg border-2 transition-all text-left ${
+                        promptStyle === 'french-academic-dynamic'
+                          ? 'border-amber-500 bg-amber-950/50'
+                          : 'border-slate-700 bg-slate-900 hover:border-amber-700'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-semibold text-slate-100">French Academic Dynamic</h4>
+                        {promptStyle === 'french-academic-dynamic' && (
+                          <CheckCircle className="h-5 w-5 text-amber-500" />
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        <Badge className="bg-pink-600 text-xs mb-1">Expressive</Badge><br />
+                        Like Géricault, Delacroix, David. Dynamic movement, expressive gestures, emotional facial expressions, environmental storytelling. Wind-swept robes, dramatic skies, narrative power.
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Style 7: Archival Photo - WW2 Only */}
                   {environment === 'ww2' && (
                     <button
                       onClick={() => setPromptStyle('archival')}
@@ -1742,7 +2599,7 @@ AVOID:
               Step 3: Review & Edit Prompts
             </CardTitle>
             <CardDescription>
-              {prompts.length} {promptStyle === 'copperplate' ? 'copperplate etching' : promptStyle === 'archival' ? 'archival photo' : environment === 'ww2' ? 'WW2 documentary' : 'Rembrandt-style'} prompts generated
+              {prompts.length} {promptStyle === 'copperplate' ? 'copperplate etching' : promptStyle === 'archival' ? 'archival photo' : promptStyle === 'french-academic' ? 'French Academic' : promptStyle === 'french-academic-dynamic' ? 'French Academic Dynamic' : environment === 'ww2' ? 'WW2 documentary' : 'Rembrandt-style'} prompts generated
               {prompts.length < chunks.length && (
                 <span className="text-yellow-400"> (Test Mode - {prompts.length} of {chunks.length} chunks)</span>
               )}
@@ -1757,6 +2614,10 @@ AVOID:
                   ? 'All prompts begin with "Create an 18th-century copperplate etching / line engraving..." as required. Edit prompts if needed.'
                   : promptStyle === 'archival'
                   ? 'All prompts begin with "WWII-era authentic archival photo..." as required. Edit prompts if needed.'
+                  : promptStyle === 'french-academic'
+                  ? 'All prompts begin with "Create a 19th-century French academic history painting..." as required. Edit prompts if needed.'
+                  : promptStyle === 'french-academic-dynamic'
+                  ? 'All prompts begin with "Create a 19th-century French academic history painting...dynamic movement and emotional expression..." as required. Edit prompts if needed.'
                   : environment === 'ww2' 
                   ? 'All prompts begin with "WW2 black and white documentary photography style." as required. Edit prompts if needed.'
                   : 'All prompts begin with "Rembrandt painting style." as required. Edit prompts if needed.'
@@ -2106,6 +2967,72 @@ AVOID:
                   Create Project
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Save Audio Preset Dialog */}
+      <Dialog open={showSavePresetDialog} onOpenChange={setShowSavePresetDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Audio Preset</DialogTitle>
+            <DialogDescription>
+              Save your current audio settings as a preset for quick access later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Preset Name</label>
+              <Input
+                type="text"
+                placeholder="e.g., Documentary Narrator, Audiobook Style..."
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && presetName.trim()) {
+                    handleSaveAudioPreset();
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            {savedAudioPresets.some(p => p.name.toLowerCase() === presetName.trim().toLowerCase()) && (
+              <Alert className="bg-amber-950 border-amber-800">
+                <AlertDescription className="text-amber-300 text-sm">
+                  A preset with this name already exists. Saving will overwrite it.
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="text-xs text-slate-400 p-3 bg-slate-900 rounded border border-slate-700">
+              <p className="font-medium mb-2">Current Settings:</p>
+              <ul className="space-y-1">
+                <li>Voice: {getVoiceName(selectedVoiceId)}</li>
+                <li>Model: {selectedAudioModel}</li>
+                <li>Stability: {voiceStability.toFixed(2)} | Similarity: {voiceSimilarity.toFixed(2)}</li>
+                <li>Style: {voiceStyle.toFixed(3)} | Speed: {voiceSpeed.toFixed(2)}x</li>
+                <li>Stitching: {useRequestStitching ? `On (depth: ${stitchingDepth})` : 'Off'}</li>
+                <li>Format: {audioOutputFormat.startsWith('pcm_') ? 'WAV' : 'MP3'} ({audioOutputFormat})</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSavePresetDialog(false);
+                setPresetName('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveAudioPreset}
+              disabled={!presetName.trim()}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Preset
             </Button>
           </DialogFooter>
         </DialogContent>

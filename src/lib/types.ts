@@ -157,3 +157,39 @@ export interface SelectedStockImage {
   image: WikimediaImage;
   selectedAt: string;
 }
+
+// --- ElevenLabs Text-to-Speech types ---
+export interface ElevenLabsVoice {
+  voice_id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  labels?: Record<string, string>;
+  preview_url?: string;
+}
+
+export interface ElevenLabsVoiceSettings {
+  stability: number; // 0-1
+  similarity_boost: number; // 0-1
+  style?: number; // 0-1 (optional)
+  use_speaker_boost?: boolean;
+  speed?: number; // 0.5-2.0
+}
+
+export interface AudioChunk {
+  chunkId: number;
+  text: string;
+  audioBlob?: Blob;
+  audioUrl?: string;
+  requestId?: string; // For request stitching
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  error?: string;
+}
+
+export interface ElevenLabsGenerationOptions {
+  voiceId: string;
+  modelId?: string; // e.g., 'eleven_multilingual_v2', 'eleven_turbo_v2_5'
+  outputFormat?: string; // e.g., 'mp3_44100_128'
+  voiceSettings?: ElevenLabsVoiceSettings;
+  previousRequestIds?: string[]; // For request stitching
+}
