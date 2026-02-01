@@ -56,12 +56,12 @@ export function ProjectCard({ project, onDelete, onEdit }: ProjectCardProps) {
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEdit(project.id)}>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(project.id); }}>
                   Edit project
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => onDelete(project.id)}
+                  onClick={(e) => { e.stopPropagation(); onDelete(project.id); }}
                   className="text-red-600 focus:text-red-600"
                 >
                   Delete project

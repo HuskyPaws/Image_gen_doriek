@@ -324,7 +324,17 @@ export default function ScriptChunkerPage() {
       localStorage.setItem('customImageStyles', JSON.stringify(updatedStyles));
     } catch (e) {
       console.error('Failed to save style:', e);
-      alert('Failed to save style to browser storage');
+      // Try to free up space by clearing non-essential data
+      try {
+        // Clear old generation logs and session data that might be taking space
+        const keysToTry = ['generationLogs', 'sessionLogs', 'generation_logs', 'pending_prompts'];
+        keysToTry.forEach(key => localStorage.removeItem(key));
+        // Retry save
+        localStorage.setItem('customImageStyles', JSON.stringify(updatedStyles));
+        alert('Saved successfully after clearing old data.');
+      } catch {
+        alert('Browser storage is full. Please go to Settings and clear some data, or clear your browser data for this site.');
+      }
     }
     
     setShowSaveStyleDialog(false);

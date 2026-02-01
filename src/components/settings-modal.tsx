@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
-import { Settings, Key, Save, Trash2 } from 'lucide-react';
+import { Settings, Key, Save, Trash2, HardDrive } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -34,6 +34,95 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [currentPexelsKey, setCurrentPexelsKey] = useState('');
   const [pixabayApiKey, setPixabayApiKey] = useState('');
   const [currentPixabayKey, setCurrentPixabayKey] = useState('');
+  const [storageInfo, setStorageInfo] = useState<{total: string, items: {key: string, size: string, sizeBytes: number, deletable: boolean, description: string}[]}>({total: '0 KB', items: []});
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+  // Keys that should never be deleted
+  const PROTECTED_KEYS = [
+    'fal_api_key', 'openai_api_key', 'openrouter_api_key', 'openrouter_model_id',
+    'pexels_api_key', 'pixabay_api_key', 'elevenlabs_api_key', 'youtube_api_key',
+    'image-generator-projects', 'image-generator-images' // User's projects and images
+  ];
+  
+  // Keys that should not be touched (external services)
+  const EXTERNAL_KEYS_PATTERN = ['auth-token', 'supabase', 'sb-'];
+
+  function getKeyDescription(key: string): string {
+    if (key === 'image-generator-generation-logs') return 'Generation history/logs (safe to clear)';
+    if (key === 'image-generator-images') return 'Your saved images (DO NOT DELETE)';
+    if (key === 'image-generator-projects') return 'Your projects (DO NOT DELETE)';
+    if (key === 'customImageStyles') return 'Custom image styles';
+    if (key === 'elevenlabs_favorite_voices') return 'Favorite voices';
+    if (key === 'elevenlabs_audio_presets') return 'Audio presets';
+    if (key === 'keyword-store') return 'Cached keywords (safe to clear)';
+    if (key.includes('auth-token') || key.includes('supabase') || key.startsWith('sb-')) return 'Auth token (external service)';
+    return 'App data';
+  }
+
+  function isKeyDeletable(key: string): boolean {
+    // Never delete API keys or projects/images
+    if (PROTECTED_KEYS.includes(key)) return false;
+    // Never delete external auth tokens
+    if (EXTERNAL_KEYS_PATTERN.some(pattern => key.includes(pattern))) return false;
+    return true;
+  }
+
+  // Calculate localStorage usage
+  function calculateStorageUsage() {
+    if (typeof window === 'undefined') return;
+    
+    let total = 0;
+    const items: {key: string, size: string, sizeBytes: number, deletable: boolean, description: string}[] = [];
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        const value = localStorage.getItem(key) || '';
+        const size = new Blob([key + value]).size;
+        total += size;
+        // Show items > 1KB
+        if (size > 1024) {
+          items.push({
+            key,
+            size: size > 1024 * 1024 
+              ? `${(size / (1024 * 1024)).toFixed(2)} MB`
+              : `${(size / 1024).toFixed(1)} KB`,
+            sizeBytes: size,
+            deletable: isKeyDeletable(key),
+            description: getKeyDescription(key)
+          });
+        }
+      }
+    }
+    
+    // Sort by size
+    items.sort((a, b) => b.sizeBytes - a.sizeBytes);
+    
+    setStorageInfo({
+      total: total > 1024 * 1024 
+        ? `${(total / (1024 * 1024)).toFixed(2)} MB`
+        : `${(total / 1024).toFixed(1)} KB`,
+      items
+    });
+  }
+
+  function deleteStorageItem(key: string) {
+    if (typeof window === 'undefined') return;
+    if (!isKeyDeletable(key)) return;
+    
+    localStorage.removeItem(key);
+    calculateStorageUsage();
+    setItemToDelete(null);
+  }
+
+  function clearSafeItems() {
+    if (typeof window === 'undefined') return;
+    
+    // Only clear items that are safe to delete (generation logs, keyword cache, etc.)
+    const safeToDelete = ['image-generator-generation-logs', 'keyword-store'];
+    safeToDelete.forEach(key => localStorage.removeItem(key));
+    calculateStorageUsage();
+  }
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -69,6 +158,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setElevenlabsApiKey(savedElevenlabs);
       setCurrentYoutubeKey(savedYoutube);
       setYoutubeApiKey(savedYoutube);
+      
+      // Calculate storage usage
+      calculateStorageUsage();
     }
   }, [isOpen]);
 
@@ -456,6 +548,59 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
           </div>
 
+          {/* Storage Management Section */}
+          <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 mb-3">
+              <HardDrive className="h-4 w-4" />
+              Browser Storage ({storageInfo.total} used)
+            </h3>
+            {storageInfo.items.length > 0 ? (
+              <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+                {storageInfo.items.map((item, i) => (
+                  <div key={i} className={`flex items-center justify-between text-xs p-2 rounded ${
+                    item.deletable 
+                      ? 'bg-slate-50 dark:bg-slate-800' 
+                      : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                  }`}>
+                    <div className="flex-1 min-w-0 mr-2">
+                      <div className="font-medium text-slate-700 dark:text-slate-300 truncate">{item.key}</div>
+                      <div className="text-slate-500 dark:text-slate-400">{item.description}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-slate-600 dark:text-slate-400">{item.size}</span>
+                      {item.deletable ? (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setItemToDelete(item.key)}
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-100"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">PROTECTED</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">No large items stored</p>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={clearSafeItems}
+              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+            >
+              <Trash2 className="h-3 w-3 mr-2" />
+              Clear Logs & Cache Only (Safe)
+            </Button>
+            <p className="text-[10px] text-slate-500 mt-2">
+              Clears generation logs and keyword cache. Keeps projects, images, styles, and API keys.
+            </p>
+          </div>
+
           {/* Action buttons */}
           <div className="flex justify-end space-x-2 pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
             <Button variant="outline" onClick={onClose}>
@@ -494,6 +639,26 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleClear}>
               Clear Key
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Storage Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &quot;{itemToDelete}&quot;? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => itemToDelete && deleteStorageItem(itemToDelete)} 
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
