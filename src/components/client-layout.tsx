@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { SettingsModal } from './settings-modal';
-import { Settings, Scissors, Globe, Eraser, Image as ImageIcon, HelpCircle } from 'lucide-react';
+import { Settings, Scissors, Globe, Eraser, Image as ImageIcon, HelpCircle, Clapperboard, Music } from 'lucide-react';
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -43,6 +43,24 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 >
                   <Scissors className="h-4 w-4 mr-2" />
                   Script Chunker
+                </Button>
+              </Link>
+              <Link href="/tools/script-chunker-v2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                >
+                  <Clapperboard className="h-4 w-4 mr-2" />
+                  Script Chunker V2
+                </Button>
+              </Link>
+              <Link href="/tools/music-video">
+                <Button
+                  variant="outline"
+                  size="sm"
+                >
+                  <Music className="h-4 w-4 mr-2" />
+                  Music Video
                 </Button>
               </Link>
               <Link href="/tools/stock-image-finder">

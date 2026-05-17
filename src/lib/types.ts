@@ -48,7 +48,7 @@ export interface GenerationLogEntry {
   createdAt: string;
 }
 
-export type ModelType = 'minimax' | 'imagen4' | 'imagen4-fast' | 'seedream' | 'seedream-v4' | 'gpt-image-1' | 'nano-banana';
+export type ModelType = 'minimax' | 'imagen4' | 'imagen4-fast' | 'seedream' | 'seedream-v4' | 'gpt-image-1' | 'gpt-image-1-5' | 'nano-banana';
 
 export interface GenerationSettings {
   model: ModelType;
@@ -56,10 +56,14 @@ export interface GenerationSettings {
   numImages: number;
   promptOptimizer: boolean;
   enableFallback?: boolean;
-  // OpenAI-specific settings
+  // OpenAI-specific settings (GPT Image 1)
   openaiBackground?: 'auto' | 'transparent' | 'opaque';
   openaiQuality?: 'auto' | 'high' | 'medium' | 'low';
   openaiOutputFormat?: 'png' | 'jpeg' | 'webp';
+  // GPT Image 1.5 specific settings (via fal.ai)
+  gptImage15Quality?: 'low' | 'medium' | 'high';
+  gptImage15Background?: 'auto' | 'transparent' | 'opaque';
+  gptImage15OutputFormat?: 'png' | 'jpeg' | 'webp';
   // Seedream-specific settings
   guidanceScale?: number;
   // Imagen 4 specific settings

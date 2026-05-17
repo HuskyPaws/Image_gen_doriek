@@ -61,6 +61,16 @@ export function ImageGenerator({ projectId, onImageGenerated, isOpen, onClose, i
     }
   }, [initialPrompts, isGenerating]);
 
+  // Reset aspect ratio when switching to GPT Image 1.5 (limited options)
+  useEffect(() => {
+    if (settings.model === 'gpt-image-1-5') {
+      const validRatios = ['1:1', '16:9', '9:16'];
+      if (!validRatios.includes(settings.aspectRatio)) {
+        setSettings(prev => ({ ...prev, aspectRatio: '1:1' }));
+      }
+    }
+  }, [settings.model, settings.aspectRatio]);
+
   async function handleGenerate() {
     if (!prompts.trim() || isGenerating) return;
 
@@ -155,7 +165,8 @@ export function ImageGenerator({ projectId, onImageGenerated, isOpen, onClose, i
               <SelectItem value="seedream">Seedream (ByteDance)</SelectItem>
               <SelectItem value="seedream-v4">Seedream v4 (ByteDance)</SelectItem>
               <SelectItem value="nano-banana">Nano Banana (Gemini 2.5)</SelectItem>
-              <SelectItem value="gpt-image-1">GPT Image 1</SelectItem>
+              <SelectItem value="gpt-image-1">GPT Image 1 (OpenAI direct)</SelectItem>
+              <SelectItem value="gpt-image-1-5">GPT Image 1.5 (via fal.ai)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -170,17 +181,27 @@ export function ImageGenerator({ projectId, onImageGenerated, isOpen, onClose, i
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1:1">Square (1:1)</SelectItem>
-              <SelectItem value="16:9">Landscape (16:9)</SelectItem>
-              <SelectItem value="4:3">Landscape (4:3)</SelectItem>
-              <SelectItem value="5:4">Landscape (5:4)</SelectItem>
-              <SelectItem value="3:2">Landscape (3:2)</SelectItem>
-              <SelectItem value="4:5">Portrait (4:5)</SelectItem>
-              <SelectItem value="2:3">Portrait (2:3)</SelectItem>
-              <SelectItem value="3:4">Portrait (3:4)</SelectItem>
-              <SelectItem value="9:16">Portrait (9:16)</SelectItem>
-              <SelectItem value="21:9">Ultra-wide (21:9)</SelectItem>
-              <SelectItem value="4:3-custom">4:3 Custom Size (2048x1536)</SelectItem>
+              {settings.model === 'gpt-image-1-5' ? (
+                <>
+                  <SelectItem value="1:1">Square (1024x1024)</SelectItem>
+                  <SelectItem value="16:9">Landscape (1536x1024)</SelectItem>
+                  <SelectItem value="9:16">Portrait (1024x1536)</SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value="1:1">Square (1:1)</SelectItem>
+                  <SelectItem value="16:9">Landscape (16:9)</SelectItem>
+                  <SelectItem value="4:3">Landscape (4:3)</SelectItem>
+                  <SelectItem value="5:4">Landscape (5:4)</SelectItem>
+                  <SelectItem value="3:2">Landscape (3:2)</SelectItem>
+                  <SelectItem value="4:5">Portrait (4:5)</SelectItem>
+                  <SelectItem value="2:3">Portrait (2:3)</SelectItem>
+                  <SelectItem value="3:4">Portrait (3:4)</SelectItem>
+                  <SelectItem value="9:16">Portrait (9:16)</SelectItem>
+                  <SelectItem value="21:9">Ultra-wide (21:9)</SelectItem>
+                  <SelectItem value="4:3-custom">4:3 Custom Size (2048x1536)</SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -195,7 +216,7 @@ export function ImageGenerator({ projectId, onImageGenerated, isOpen, onClose, i
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {settings.model === 'gpt-image-1' 
+              {(settings.model === 'gpt-image-1' || settings.model === 'gpt-image-1-5')
                 ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
                     <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
                   ))
@@ -222,6 +243,23 @@ export function ImageGenerator({ projectId, onImageGenerated, isOpen, onClose, i
                 <SelectItem value="auto">Auto</SelectItem>
                 <SelectItem value="high">High</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : settings.model === 'gpt-image-1-5' ? (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Quality</label>
+            <Select 
+              value={settings.gptImage15Quality || 'medium'} 
+              onValueChange={(value) => setSettings(prev => ({ ...prev, gptImage15Quality: value as any }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium (Default)</SelectItem>
                 <SelectItem value="low">Low</SelectItem>
               </SelectContent>
             </Select>
@@ -356,6 +394,45 @@ export function ImageGenerator({ projectId, onImageGenerated, isOpen, onClose, i
         </div>
       )}
 
+      {/* Additional GPT Image 1.5 Settings */}
+      {settings.model === 'gpt-image-1-5' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Background</label>
+            <Select 
+              value={settings.gptImage15Background || 'auto'} 
+              onValueChange={(value) => setSettings(prev => ({ ...prev, gptImage15Background: value as any }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto</SelectItem>
+                <SelectItem value="transparent">Transparent</SelectItem>
+                <SelectItem value="opaque">Opaque</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Output Format</label>
+            <Select 
+              value={settings.gptImage15OutputFormat || 'png'} 
+              onValueChange={(value) => setSettings(prev => ({ ...prev, gptImage15OutputFormat: value as any }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="png">PNG</SelectItem>
+                <SelectItem value="jpeg">JPEG</SelectItem>
+                <SelectItem value="webp">WebP</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
       {/* Model Info */}
       {settings.model === 'imagen4' && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -436,10 +513,26 @@ export function ImageGenerator({ projectId, onImageGenerated, isOpen, onClose, i
           <div className="flex items-start space-x-2">
             <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="space-y-1">
-              <p className="text-sm font-medium text-blue-800">GPT Image 1 (OpenAI)</p>
+              <p className="text-sm font-medium text-blue-800">GPT Image 1 (OpenAI Direct)</p>
               <p className="text-sm text-blue-700">
                 Requires OpenAI API key. Supports up to 10 images per prompt, transparent backgrounds, 
                 and multiple output formats. Go to Settings to configure your OpenAI API key.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {settings.model === 'gpt-image-1-5' && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex items-start space-x-2">
+            <AlertCircle className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-purple-800">GPT Image 1.5 (via fal.ai)</p>
+              <p className="text-sm text-purple-700">
+                OpenAI's latest state-of-the-art image generation model, accessed via fal.ai. 
+                Supports up to 10 images per prompt, transparent backgrounds, and multiple output formats.
+                Requires fal.ai API key (configured in Settings).
               </p>
             </div>
           </div>

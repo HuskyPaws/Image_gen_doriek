@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
-import { Settings, Key, Save, Trash2, HardDrive } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Settings, Key, Save, Trash2, HardDrive, Palette, Eye, ChevronUp, Edit2 } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -36,6 +37,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [currentPixabayKey, setCurrentPixabayKey] = useState('');
   const [storageInfo, setStorageInfo] = useState<{total: string, items: {key: string, size: string, sizeBytes: number, deletable: boolean, description: string}[]}>({total: '0 KB', items: []});
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  
+  // Custom styles management
+  const [customStyles, setCustomStyles] = useState<{name: string, prompt: string}[]>([]);
+  const [expandedStyle, setExpandedStyle] = useState<string | null>(null);
+  const [styleToDelete, setStyleToDelete] = useState<string | null>(null);
+  const [editingStyle, setEditingStyle] = useState<{name: string, prompt: string} | null>(null);
+  const [editStyleName, setEditStyleName] = useState('');
+  const [editStylePrompt, setEditStylePrompt] = useState('');
 
   // Keys that should never be deleted
   const PROTECTED_KEYS = [
@@ -124,6 +133,56 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     calculateStorageUsage();
   }
 
+  function loadCustomStyles() {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = localStorage.getItem('customImageStyles');
+      if (saved) {
+        setCustomStyles(JSON.parse(saved));
+      }
+    } catch {
+      setCustomStyles([]);
+    }
+  }
+
+  function deleteCustomStyle(name: string) {
+    if (typeof window === 'undefined') return;
+    const updated = customStyles.filter(s => s.name !== name);
+    setCustomStyles(updated);
+    try {
+      localStorage.setItem('customImageStyles', JSON.stringify(updated));
+      calculateStorageUsage();
+    } catch {
+      // Ignore save errors
+    }
+    setStyleToDelete(null);
+  }
+
+  function startEditingStyle(style: {name: string, prompt: string}) {
+    setEditingStyle(style);
+    setEditStyleName(style.name);
+    setEditStylePrompt(style.prompt);
+  }
+
+  function saveEditedStyle() {
+    if (!editingStyle || typeof window === 'undefined') return;
+    
+    const updated = customStyles.map(s => 
+      s.name === editingStyle.name 
+        ? { name: editStyleName.trim() || editingStyle.name, prompt: editStylePrompt }
+        : s
+    );
+    
+    setCustomStyles(updated);
+    try {
+      localStorage.setItem('customImageStyles', JSON.stringify(updated));
+      calculateStorageUsage();
+    } catch {
+      alert('Failed to save - storage may be full');
+    }
+    setEditingStyle(null);
+  }
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedFal = localStorage.getItem('fal_api_key') || '';
@@ -161,6 +220,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       
       // Calculate storage usage
       calculateStorageUsage();
+      
+      // Load custom styles
+      loadCustomStyles();
     }
   }, [isOpen]);
 
@@ -601,6 +663,76 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </p>
           </div>
 
+          {/* Custom Styles Section */}
+          <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 mb-3">
+              <Palette className="h-4 w-4" />
+              Custom Image Styles ({customStyles.length})
+            </h3>
+            {customStyles.length > 0 ? (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {customStyles.map((style) => (
+                  <div 
+                    key={style.name} 
+                    className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
+                  >
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="font-medium text-sm text-slate-700 dark:text-slate-300 truncate">
+                          {style.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setExpandedStyle(expandedStyle === style.name ? null : style.name)}
+                          className="h-7 w-7 p-0"
+                          title="View prompt"
+                        >
+                          {expandedStyle === style.name ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditingStyle(style)}
+                          className="h-7 w-7 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                          title="Edit style"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setStyleToDelete(style.name)}
+                          className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-100"
+                          title="Delete style"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    {expandedStyle === style.name && (
+                      <div className="px-3 pb-3 pt-0">
+                        <div className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-600 p-2 text-xs text-slate-600 dark:text-slate-400 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                          {style.prompt}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                No custom styles saved. Create styles in the Script Chunker tool.
+              </p>
+            )}
+          </div>
+
           {/* Action buttons */}
           <div className="flex justify-end space-x-2 pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
             <Button variant="outline" onClick={onClose}>
@@ -663,6 +795,73 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!styleToDelete} onOpenChange={() => setStyleToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Custom Style</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the style &quot;{styleToDelete}&quot;? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => styleToDelete && deleteCustomStyle(styleToDelete)} 
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Style
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Style Dialog */}
+      <Dialog open={!!editingStyle} onOpenChange={() => setEditingStyle(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="h-5 w-5" />
+              Edit Custom Style
+            </DialogTitle>
+            <DialogDescription>
+              Modify the name and prompt for this style.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Style Name</label>
+              <Input
+                value={editStyleName}
+                onChange={(e) => setEditStyleName(e.target.value)}
+                placeholder="Enter style name..."
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Style Prompt</label>
+              <Textarea
+                value={editStylePrompt}
+                onChange={(e) => setEditStylePrompt(e.target.value)}
+                placeholder="Enter the style prompt..."
+                rows={8}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Use {'{scene}'} as a placeholder for the scene description.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditingStyle(null)}>
+              Cancel
+            </Button>
+            <Button onClick={saveEditedStyle}>
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 } 

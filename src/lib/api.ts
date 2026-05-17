@@ -152,12 +152,92 @@ async function generateWithOpenAI(options: GenerateImageOptions): Promise<FalApi
   }
 }
 
+// Convert aspect ratio to GPT Image 1.5 size format
+function aspectRatioToGPTImage15Size(aspectRatio: string): '1024x1024' | '1536x1024' | '1024x1536' {
+  switch (aspectRatio) {
+    case '1:1':
+      return '1024x1024';
+    case '16:9':
+    case '21:9':
+    case '4:3':
+    case '3:2':
+    case '4:3-custom':
+      return '1536x1024'; // Landscape
+    case '9:16':
+    case '2:3':
+    case '3:4':
+      return '1024x1536'; // Portrait
+    default:
+      return '1024x1024';
+  }
+}
+
+// Generate image with GPT Image 1.5 via fal.ai
+async function generateWithGPTImage15(options: GenerateImageOptions): Promise<FalApiResult> {
+  const { prompt, settings, onProgress } = options;
+  
+  // Ensure fal.ai client is configured
+  if (!configureFalClient()) {
+    throw new Error('fal.ai API key not configured. Please add your fal.ai API key in settings.');
+  }
+
+  const imageSize = aspectRatioToGPTImage15Size(settings.aspectRatio);
+  
+  console.log(`🎨 Generating with GPT Image 1.5:`, { 
+    prompt: prompt.substring(0, 50) + '...',
+    settings: {
+      image_size: imageSize,
+      num_images: settings.numImages,
+      quality: settings.gptImage15Quality || 'medium',
+      background: settings.gptImage15Background || 'auto',
+      output_format: settings.gptImage15OutputFormat || 'png'
+    }
+  });
+
+  try {
+    const result = await fal.subscribe('fal-ai/gpt-image-1.5', {
+      input: {
+        prompt: prompt.trim(),
+        image_size: imageSize,
+        num_images: settings.numImages,
+        quality: settings.gptImage15Quality || 'medium', // Default to medium as requested
+        background: settings.gptImage15Background || 'auto',
+        output_format: settings.gptImage15OutputFormat || 'png',
+      },
+      logs: true,
+      onQueueUpdate: (update) => {
+        if (onProgress) {
+          onProgress(update);
+        }
+        if (update.status === 'IN_PROGRESS' && update.logs) {
+          update.logs.map((log: any) => log.message).forEach(console.log);
+        }
+      },
+    });
+
+    console.log(`✅ GPT Image 1.5 generation successful`);
+    
+    return {
+      data: result.data as any,
+      requestId: result.requestId,
+    } as FalApiResult;
+  } catch (error) {
+    console.error(`❌ GPT Image 1.5 generation failed:`, error);
+    throw error;
+  }
+}
+
 export async function generateImage(options: GenerateImageOptions): Promise<FalApiResult> {
   const { prompt, settings, onProgress } = options;
 
   // Handle OpenAI GPT Image 1
   if (settings.model === 'gpt-image-1') {
     return generateWithOpenAI(options);
+  }
+
+  // Handle GPT Image 1.5 via fal.ai
+  if (settings.model === 'gpt-image-1-5') {
+    return generateWithGPTImage15(options);
   }
 
   // Handle FAL.ai models (minimax, imagen4, imagen4-fast, seedream, seedream-v4, nano-banana)
